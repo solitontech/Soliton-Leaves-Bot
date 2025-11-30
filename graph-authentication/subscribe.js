@@ -11,7 +11,7 @@ async function subscribeToMailbox() {
             changeType: "created",
             notificationUrl: env.PUBLIC_URL + "/email-notification",
             resource: "users/karthikeyan.balasubramanian@solitontech.in/messages",
-            expirationDateTime: "2026-01-01T00:00:00Z",
+            expirationDateTime: "2027-01-01T00:00:00Z",
             clientState: "YOUR_SECRET_STATE"
         },
         {
