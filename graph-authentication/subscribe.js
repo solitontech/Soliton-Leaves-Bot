@@ -1,6 +1,6 @@
-const axios = require("axios");
-const getGraphToken = require("./graphAuth");
-const env = require("../server/env");
+import axios from "axios";
+import getGraphToken from "./graphAuth.js";
+import env from "../server/env.js";
 
 async function subscribeToMailbox() {
     const token = await getGraphToken();

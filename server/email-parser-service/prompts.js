@@ -37,6 +37,4 @@ Please respond ONLY with a valid JSON object in the following format:
 If you cannot determine any field with confidence, use null for that field.`;
 }
 
-module.exports = {
-    getLeaveRequestPrompt
-};
+export { getLeaveRequestPrompt };

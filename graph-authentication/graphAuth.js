@@ -1,6 +1,6 @@
-const axios = require("axios");
-const qs = require("qs");
-const env = require("../server/env");
+import axios from "axios";
+import qs from "qs";
+import env from "../server/env.js";
 
 async function getGraphToken() {
     const url = `https://login.microsoftonline.com/${env.TENANT_ID}/oauth2/v2.0/token`;
@@ -19,4 +19,4 @@ async function getGraphToken() {
     return res.data.access_token;
 }
 
-module.exports = getGraphToken;
+export default getGraphToken;

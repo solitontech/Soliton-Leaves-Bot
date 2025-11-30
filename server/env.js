@@ -4,7 +4,8 @@
  * All environment variables should be accessed through this module
  */
 
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
 /**
  * Environment variables configuration object
@@ -50,4 +51,4 @@ function validateEnv() {
 // Validate on module load
 validateEnv();
 
-module.exports = env;
+export default env;

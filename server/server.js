@@ -1,14 +1,14 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const getGraphToken = require("./graphAuth");
-const axios = require("axios");
-const { parseLeaveRequest, validateLeaveRequest } = require("./email-parser-service/emailParser");
-const env = require("./env");
+import express from "express";
+import bodyParser from "body-parser";
+import getGraphToken from "../graph-authentication/graphAuth.js";
+import axios from "axios";
+import { parseLeaveRequest, validateLeaveRequest } from "./email-parser-service/emailParser.js";
+import env from "./env.js";
 
 const app = express();
 app.use(bodyParser.json());
 
-const { CloudAdapter, ConfigurationServiceClientCredentialFactory } = require("@microsoft/botbuilder");
+import { CloudAdapter, ConfigurationServiceClientCredentialFactory } from "botbuilder";
 
 const credentialFactory = new ConfigurationServiceClientCredentialFactory({
     MicrosoftAppId: env.BOT_APP_ID,

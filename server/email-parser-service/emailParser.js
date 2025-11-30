@@ -1,7 +1,7 @@
-const axios = require("axios");
+import axios from "axios";
 import OpenAI from "openai";
-const { getLeaveRequestPrompt } = require("./prompts");
-const env = require("../env");
+import { getLeaveRequestPrompt } from "./prompts.js";
+import env from "../env.js";
 
 const openai = new OpenAI({
     apiKey: env.OPENAI_API_KEY,
@@ -104,7 +104,4 @@ function validateLeaveRequest(parsedData) {
     };
 }
 
-module.exports = {
-    parseLeaveRequest,
-    validateLeaveRequest
-};
+export { parseLeaveRequest, validateLeaveRequest };
