@@ -1,39 +1,39 @@
 {
-  "name": "soliton-leaves-bot",
-  "version": "1.0.0",
-  "description": "Microsoft Teams bot for processing leave requests via email using AI",
-  "main": "server/server.js",
-  "type": "module",
-  "scripts": {
-    "start": "node server/server.js",
-    "dev": "nodemon server/server.js",
-    "subscribe": "node graph-authentication/subscribe.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-    "microsoft-teams",
-    "bot",
-    "leave-management",
-    "email-parser",
-    "openai",
-    "microsoft-graph"
-  ],
-  "author": "Soliton Technologies",
-  "license": "ISC",
-  "dependencies": {
-    "@microsoft/botbuilder": "^4.22.0",
-    "axios": "^1.6.5",
-    "body-parser": "^1.20.2",
-    "dotenv": "^16.4.1",
-    "express": "^4.18.2",
-    "openai": "^4.28.0",
-    "qs": "^6.11.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.3"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  }
+    "name": "soliton-leaves-bot",
+    "version": "1.0.0",
+    "description": "Microsoft Teams bot for processing leave requests via email using AI",
+    "main": "server/server.js",
+    "type": "module",
+    "scripts": {
+        "start": "node server/server.js",
+        "dev": "nodemon server/server.js",
+        "subscribe": "node graph-authentication/subscribe.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "microsoft-teams",
+        "bot",
+        "leave-management",
+        "email-parser",
+        "openai",
+        "microsoft-graph"
+    ],
+    "author": "Soliton Technologies",
+    "license": "ISC",
+    "dependencies": {
+        "botbuilder": "^4.22.0",
+        "axios": "^1.6.5",
+        "body-parser": "^1.20.2",
+        "dotenv": "^16.4.1",
+        "express": "^4.18.2",
+        "openai": "^4.28.0",
+        "qs": "^6.11.2"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.3"
+    },
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=9.0.0"
+    }
 }
