@@ -26,7 +26,17 @@ app.post("/api/messages", (req, res) => {
 
 // Email webhook — Microsoft Graph will POST here
 app.post("/email-notification", async (req, res) => {
-    console.log("Graph notification:", req.body);
+    console.log("📨 Received Graph notification");
+
+    // Handle subscription validation
+    if (req.query.validationToken) {
+        console.log("✅ Validation request received");
+        console.log("Validation token:", req.query.validationToken);
+        // Microsoft Graph requires us to return the validation token with 200 OK
+        return res.status(200).send(req.query.validationToken);
+    }
+
+    console.log("Graph notification body:", req.body);
     res.sendStatus(200);
 
     const notif = req.body.value?.[0];

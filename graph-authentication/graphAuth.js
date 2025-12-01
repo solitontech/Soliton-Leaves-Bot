@@ -16,6 +16,8 @@ async function getGraphToken() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" }
     });
 
+    console.log("GOT GRAPH TOKEN")
+
     return res.data.access_token;
 }
 
