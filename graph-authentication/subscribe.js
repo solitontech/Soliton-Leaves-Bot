@@ -40,7 +40,6 @@ async function subscribeToMailbox() {
 
         if (error.response) {
             console.error("Status:", error.response.status);
-            //console.error("Error details:", JSON.stringify(error.response.data, null, 2));
 
             if (error.response.data?.error?.message) {
                 console.error("\n💡 Error message:", error.response.data.error.message);
@@ -53,11 +52,12 @@ async function subscribeToMailbox() {
                     console.error("   3. Verify PUBLIC_URL in .env is correct and uses HTTPS");
                     console.error("   4. Check if your server has a valid SSL certificate");
                     console.error("   5. Test your webhook URL manually: curl -X POST " + env.PUBLIC_URL + "/email-notification?validationToken=test");
+                } else {
+                    console.error("Error details:", JSON.stringify(error.response.data, null, 2));
                 }
             }
         } else {
-            console.error("Error");
-            //console.error("Error:", error.message);
+            console.error("Error:", error.message);
         }
 
         process.exit(1);
