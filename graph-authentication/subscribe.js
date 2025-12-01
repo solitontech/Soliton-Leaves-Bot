@@ -40,7 +40,7 @@ async function subscribeToMailbox() {
 
         if (error.response) {
             console.error("Status:", error.response.status);
-            console.error("Error details:", JSON.stringify(error.response.data, null, 2));
+            //console.error("Error details:", JSON.stringify(error.response.data, null, 2));
 
             if (error.response.data?.error?.message) {
                 console.error("\n💡 Error message:", error.response.data.error.message);
@@ -56,7 +56,8 @@ async function subscribeToMailbox() {
                 }
             }
         } else {
-            console.error("Error:", error.message);
+            console.error("Error");
+            //console.error("Error:", error.message);
         }
 
         process.exit(1);
