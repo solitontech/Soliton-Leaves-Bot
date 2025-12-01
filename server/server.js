@@ -84,4 +84,4 @@ app.post("/email-notification", async (req, res) => {
 });
 
 // Run server
-app.listen(80, () => console.log("Backend listening on port 80"));
+app.listen(443, () => console.log("Backend listening on port 443"));
