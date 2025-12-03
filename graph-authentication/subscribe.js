@@ -18,13 +18,21 @@ async function subscribeToMailbox() {
         }
 
         console.log("📤 Creating subscription...");
+
+        // Calculate expiration date (7 days from now - maximum allowed by Microsoft Graph)
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + 7);
+        const expirationDateTime = expirationDate.toISOString();
+
+        console.log(`📅 Subscription will expire on: ${expirationDateTime}`);
+
         const res = await axios.post(
             "https://graph.microsoft.com/v1.0/subscriptions",
             {
                 changeType: "created",
                 notificationUrl: notificationUrl,
                 resource: "users/karthikeyan.balasubramanian@solitontech.in/messages",
-                expirationDateTime: "2027-01-01T00:00:00Z",
+                expirationDateTime: expirationDateTime,
                 clientState: "YOUR_SECRET_STATE"
             },
             {
@@ -48,10 +56,9 @@ async function subscribeToMailbox() {
                 if (error.response.data.error.message.includes("Unable to connect")) {
                     console.error("\n🔧 Troubleshooting steps:");
                     console.error("   1. Make sure your server is running (npm start)");
-                    console.error("   2. Ensure port 443 (HTTPS) is open and accessible");
-                    console.error("   3. Verify PUBLIC_URL in .env is correct and uses HTTPS");
-                    console.error("   4. Check if your server has a valid SSL certificate");
-                    console.error("   5. Test your webhook URL manually: curl -X POST " + env.PUBLIC_URL + "/email-notification?validationToken=test");
+                    console.error("   2. Verify PUBLIC_URL in .env is correct and uses HTTPS");
+                    console.error("   3. Check if your server has a valid SSL certificate");
+                    console.error("   4. Test your webhook URL manually: curl -X POST " + env.PUBLIC_URL + "/email-notification?validationToken=test");
                 } else {
                     console.error("Error details:", JSON.stringify(error.response.data, null, 2));
                 }

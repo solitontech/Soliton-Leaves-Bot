@@ -118,15 +118,5 @@ if (env.USE_HTTPS && env.SSL_KEY_PATH && env.SSL_CERT_PATH) {
     server.listen(80, () => {
         console.log(`⚠️  HTTP Server listening on port 80`);
         console.log(`🌐 Public URL: ${env.PUBLIC_URL}`);
-
-        if (env.PUBLIC_URL && env.PUBLIC_URL.startsWith('https://')) {
-            console.warn("\n⚠️  WARNING: PUBLIC_URL uses HTTPS but server is running in HTTP mode!");
-            console.warn("   Microsoft Graph requires HTTPS for webhooks.");
-            console.warn("   To enable HTTPS, set these in your .env file:");
-            console.warn("   USE_HTTPS=true");
-            console.warn("   SSL_KEY_PATH=/path/to/private-key.pem");
-            console.warn("   SSL_CERT_PATH=/path/to/certificate.pem");
-            console.warn("\n   OR use a reverse proxy (nginx) to handle SSL.");
-        }
     });
 }
