@@ -83,5 +83,50 @@ app.post("/email-notification", async (req, res) => {
     }
 });
 
-// Run server
-app.listen(443, () => console.log("Backend listening on port 443"));
+// Run server with HTTPS support
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
+
+let server;
+
+if (env.USE_HTTPS && env.SSL_KEY_PATH && env.SSL_CERT_PATH) {
+    // HTTPS mode with SSL certificates
+    try {
+        const httpsOptions = {
+            key: fs.readFileSync(env.SSL_KEY_PATH),
+            cert: fs.readFileSync(env.SSL_CERT_PATH)
+        };
+
+        server = https.createServer(httpsOptions, app);
+        server.listen(443, () => {
+            console.log(`✅ HTTPS Server listening on port 443`);
+            console.log(`🔒 SSL Certificate: ${env.SSL_CERT_PATH}`);
+            console.log(`🌐 Public URL: ${env.PUBLIC_URL}`);
+        });
+    } catch (error) {
+        console.error("❌ Failed to start HTTPS server:");
+        console.error("   Error:", error.message);
+        console.error("\n💡 Check that SSL certificate files exist and are readable:");
+        console.error(`   Key: ${env.SSL_KEY_PATH}`);
+        console.error(`   Cert: ${env.SSL_CERT_PATH}`);
+        process.exit(1);
+    }
+} else {
+    // HTTP mode (fallback)
+    server = http.createServer(app);
+    server.listen(80, () => {
+        console.log(`⚠️  HTTP Server listening on port 80`);
+        console.log(`🌐 Public URL: ${env.PUBLIC_URL}`);
+
+        if (env.PUBLIC_URL && env.PUBLIC_URL.startsWith('https://')) {
+            console.warn("\n⚠️  WARNING: PUBLIC_URL uses HTTPS but server is running in HTTP mode!");
+            console.warn("   Microsoft Graph requires HTTPS for webhooks.");
+            console.warn("   To enable HTTPS, set these in your .env file:");
+            console.warn("   USE_HTTPS=true");
+            console.warn("   SSL_KEY_PATH=/path/to/private-key.pem");
+            console.warn("   SSL_CERT_PATH=/path/to/certificate.pem");
+            console.warn("\n   OR use a reverse proxy (nginx) to handle SSL.");
+        }
+    });
+}

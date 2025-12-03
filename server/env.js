@@ -23,6 +23,11 @@ const env = {
 
     // Server Configuration
     PUBLIC_URL: process.env.PUBLIC_URL,
+    USE_HTTPS: process.env.USE_HTTPS === 'true',
+
+    // SSL Certificate Configuration (optional, for HTTPS)
+    SSL_KEY_PATH: process.env.SSL_KEY_PATH,
+    SSL_CERT_PATH: process.env.SSL_CERT_PATH,
 };
 
 /**
