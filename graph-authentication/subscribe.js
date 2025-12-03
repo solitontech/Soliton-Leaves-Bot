@@ -21,7 +21,7 @@ async function subscribeToMailbox() {
 
         // Calculate expiration date (7 days from now - maximum allowed by Microsoft Graph)
         const expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() + 7);
+        expirationDate.setDate(expirationDate.getDate() + 6);
         const expirationDateTime = expirationDate.toISOString();
 
         console.log(`📅 Subscription will expire on: ${expirationDateTime}`);
