@@ -17,8 +17,10 @@ function getLeaveRequestPrompt(emailContent) {
 
 Analyze the following email and extract:
 1. From email address
-2. Type of leave request (e.g., Sick Leave, Casual Leave, Annual Leave, Vacation, Personal Leave, etc.)
-3. Leave dates (start date and end date)
+2. Type of leave request (e.g., Sick Leave, Casual Leave, Privilege Leave, Comp off, etc.)
+3. Leave dates (from date and to date)
+4. Transaction type: either "availed" (applying for leave) or "cancelled" (cancelling a leave)
+5. Reason for leave (if mentioned)
 
 Email Details:
 From: ${emailContent.from}
@@ -28,13 +30,18 @@ Body: ${emailContent.bodyPreview || emailContent.body}
 Please respond ONLY with a valid JSON object in the following format:
 {
   "fromEmail": "email@example.com",
+  "fromDate": "YYYY-MM-DD",
+  "toDate": "YYYY-MM-DD",
   "leaveType": "type of leave",
-  "startDate": "YYYY-MM-DD",
-  "endDate": "YYYY-MM-DD",
+  "transaction": "availed or cancelled",
+  "reason": "reason for leave if mentioned",
   "confidence": "high/medium/low"
 }
 
-If you cannot determine any field with confidence, use null for that field.`;
+Important:
+- transaction should be "availed" for applying for leave, or "cancelled" for cancelling a leave
+- If not specified, default transaction to "availed"
+- If you cannot determine any field with confidence, use null for that field.`;
 }
 
 export { getLeaveRequestPrompt };

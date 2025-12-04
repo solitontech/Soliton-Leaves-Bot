@@ -31,6 +31,13 @@ const env = {
     // SSL Certificate Configuration (optional, for HTTPS)
     SSL_KEY_PATH: process.env.SSL_KEY_PATH,
     SSL_CERT_PATH: process.env.SSL_CERT_PATH,
+
+    // GreytHR Configuration
+    GREYTHR_API_URL: "https://api.greythr.com/",
+    GREYTHR_AUTH_URL: process.env.GREYTHR_AUTH_URL,
+    GREYTHR_DOMAIN: process.env.GREYTHR_DOMAIN,
+    GREYTHR_USERNAME: process.env.GREYTHR_USERNAME,
+    GREYTHR_PASSWORD: process.env.GREYTHR_PASSWORD,
 };
 
 /**
@@ -44,7 +51,12 @@ function validateEnv() {
         'TENANT_ID',
         'OPENAI_API_KEY',
         'PUBLIC_URL',
-        'MONITORED_EMAIL'
+        'MONITORED_EMAIL',
+        'GREYTHR_API_URL',
+        'GREYTHR_AUTH_URL',
+        'GREYTHR_DOMAIN',
+        'GREYTHR_USERNAME',
+        'GREYTHR_PASSWORD'
     ];
 
     const missingVars = requiredVars.filter(varName => !env[varName]);

@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import getGraphToken from "../graph-authentication/graphAuth.js";
 import axios from "axios";
 import { parseLeaveRequest, validateLeaveRequest } from "./email-parser-service/emailParser.js";
+import { processLeaveApplication } from "./greytHr-service/leaveApplicationService.js";
 import env from "./env.js";
 
 const app = express();
@@ -63,14 +64,33 @@ app.post("/email-notification", async (req, res) => {
                 console.log("✅ Valid leave request parsed:");
                 console.log(`   From: ${leaveRequest.fromEmail}`);
                 console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-                console.log(`   Start Date: ${leaveRequest.startDate}`);
-                console.log(`   End Date: ${leaveRequest.endDate}`);
+                console.log(`   Transaction: ${leaveRequest.transaction}`);
+                console.log(`   Start Date: ${leaveRequest.fromDate}`);
+                console.log(`   To Date: ${leaveRequest.toDate}`);
+                console.log(`   Reason: ${leaveRequest.reason || "N/A"}`);
                 console.log(`   Confidence: ${leaveRequest.confidence}`);
 
-                // TODO: Process the leave request
-                // - Save to database
-                // - Send to GreytHR service
-                // - Send confirmation email
+                // Process the leave request with GreytHR
+                try {
+                    console.log("\n🚀 Submitting to GreytHR...");
+                    const result = await processLeaveApplication(leaveRequest);
+
+                    if (result.success) {
+                        console.log("✅ Leave application submitted successfully!");
+                        console.log(`   Application ID: ${result.applicationId}`);
+
+                        // TODO: Send confirmation email to employee
+                        // TODO: Save to database for tracking
+                    } else {
+                        console.error("❌ Leave application failed:");
+                        console.error(`   Error: ${result.error}`);
+
+                        // TODO: Send error notification to employee
+                    }
+                } catch (greytHrError) {
+                    console.error("❌ GreytHR integration error:", greytHrError.message);
+                    // TODO: Send error notification to employee
+                }
 
             } else {
                 console.log("⚠️ Incomplete leave request detected");

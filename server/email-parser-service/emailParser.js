@@ -56,15 +56,12 @@ async function parseLeaveRequest(emailData) {
         // Validate and return the parsed data
         const result = {
             fromEmail: parsedData.fromEmail || emailContent.from,
+            fromDate: parsedData.fromDate || null,
+            toDate: parsedData.toDate || parsedData.endDate || null,
             leaveType: parsedData.leaveType || null,
-            startDate: parsedData.startDate || null,
-            endDate: parsedData.endDate || null,
+            transaction: parsedData.transaction || "availed",
+            reason: parsedData.reason || null,
             confidence: parsedData.confidence || "low",
-            rawEmail: {
-                subject: emailContent.subject,
-                from: emailContent.from,
-                bodyPreview: emailContent.bodyPreview
-            }
         };
 
         console.log("Parsed leave request:", result);
@@ -88,7 +85,7 @@ async function parseLeaveRequest(emailData) {
  * @returns {Object} Validation result with isValid flag and missing fields
  */
 function validateLeaveRequest(parsedData) {
-    const requiredFields = ["fromEmail", "leaveType", "startDate", "endDate"];
+    const requiredFields = ["fromEmail", "fromDate", "toDate", "leaveType", "transaction"];
     const missingFields = [];
 
     for (const field of requiredFields) {
