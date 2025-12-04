@@ -41,6 +41,7 @@ Please respond ONLY with a valid JSON object in the following format:
 Important:
 - transaction should be "availed" for applying for leave, or "cancelled" for cancelling a leave
 - If not specified, default transaction to "availed"
+- If leave type is not specified, or mentioned as "personal leave" or "personal work", then default to "Sick Leave"
 - If you cannot determine any field with confidence, use null for that field.`;
 }
 
