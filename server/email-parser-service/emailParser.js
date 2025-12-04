@@ -28,16 +28,14 @@ async function parseLeaveRequest(emailData) {
         const prompt = getLeaveRequestPrompt(emailContent);
 
         // Call OpenAI API
-        const response = openai.responses.create({
+        const response = await openai.responses.create({
             model: "gpt-5-nano",
             input: prompt,
             store: true,
         });
 
-        console.log(response);
-
         // Parse the response
-        const aiResponse = response.data.choices[0].message.content;
+        const aiResponse = response.output_text;
         console.log("OpenAI Response:", aiResponse);
 
         // Extract JSON from the response (in case there's extra text)
