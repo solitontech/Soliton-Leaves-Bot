@@ -24,8 +24,12 @@ async function parseLeaveRequest(emailData) {
 
         console.log("Parsing email from:", emailContent.from);
 
+        console.log("PRE PROMPT");
+
         // Prepare the prompt for OpenAI
         const prompt = getLeaveRequestPrompt(emailContent);
+
+        console.log("POST PROMPT");
 
         // Call OpenAI API
         const response = openai.responses.create({
@@ -33,6 +37,8 @@ async function parseLeaveRequest(emailData) {
             input: prompt,
             store: true,
         });
+
+        console.log("POST API CALL");
 
         // Parse the response
         const aiResponse = response.data.choices[0].message.content;
