@@ -47,7 +47,7 @@ app.post("/email-notification", async (req, res) => {
     if (messageId) {
         const token = await getGraphToken();
         const email = await axios.get(
-            `https://graph.microsoft.com/v1.0/users/karthikeyan.balasubramanian@solitontech.in/messages/${messageId}`,
+            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
             { headers: { Authorization: `Bearer ${token}` } }
         );
 

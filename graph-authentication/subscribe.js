@@ -31,7 +31,7 @@ async function subscribeToMailbox() {
             {
                 changeType: "created",
                 notificationUrl: notificationUrl,
-                resource: "users/karthikeyan.balasubramanian@solitontech.in/messages",
+                resource: `users/${env.MONITORED_EMAIL}/messages`,
                 expirationDateTime: expirationDateTime,
                 clientState: "YOUR_SECRET_STATE"
             },

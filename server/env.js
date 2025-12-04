@@ -25,6 +25,9 @@ const env = {
     PUBLIC_URL: process.env.PUBLIC_URL,
     USE_HTTPS: process.env.USE_HTTPS === 'true',
 
+    // Monitored Email
+    MONITORED_EMAIL: process.env.MONITORED_EMAIL,
+
     // SSL Certificate Configuration (optional, for HTTPS)
     SSL_KEY_PATH: process.env.SSL_KEY_PATH,
     SSL_CERT_PATH: process.env.SSL_CERT_PATH,
@@ -40,7 +43,8 @@ function validateEnv() {
         'BOT_APP_SECRET',
         'TENANT_ID',
         'OPENAI_API_KEY',
-        'PUBLIC_URL'
+        'PUBLIC_URL',
+        'MONITORED_EMAIL'
     ];
 
     const missingVars = requiredVars.filter(varName => !env[varName]);

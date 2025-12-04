@@ -13,7 +13,7 @@
  * @returns {string} The formatted prompt for OpenAI
  */
 function getLeaveRequestPrompt(emailContent) {
-    return `You are an AI assistant that extracts leave request information from emails.
+  return `You are an AI assistant that extracts leave request information from emails.
 
 Analyze the following email and extract:
 1. From email address
