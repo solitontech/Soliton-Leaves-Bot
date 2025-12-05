@@ -54,11 +54,7 @@ export async function processLeaveApplication(leaveRequest) {
 
         // Step 3: Submit to GreytHR
         console.log("\n🚀 Step 3: Submitting to GreytHR...");
-        //const result = await applyLeave(leaveApplication);
-        const result = {
-            success: true,
-            message: "fake leave applied"
-        }
+        const result = await applyLeave(leaveApplication);
 
         console.log("\n" + "=".repeat(60));
         console.log("✅ Leave Application Successful!");

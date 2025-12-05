@@ -53,11 +53,9 @@ export async function getEmployeeByEmail(email) {
             `employee/v2/employees/lookup?q=${encodeURIComponent(email)}`
         );
 
-        if (response.data) {
-            console.log(`✅ Found employee: ${response.data.name}`);
-            return response.data;
-        } else {
-            console.log(response);
+        if (response.employeeId) {
+            console.log(`✅ Found employee: ${response.name}`);
+            return response;
         }
 
         throw new Error(`Employee not found with email: ${email}`);
