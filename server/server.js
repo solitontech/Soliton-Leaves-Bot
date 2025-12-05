@@ -71,7 +71,7 @@ app.post("/email-notification", async (req, res) => {
                 console.log(`   Confidence: ${leaveRequest.confidence}`);
 
                 // TODO: Process the leave request with GreytHR
-                /*
+
 
                 // Process the leave request with GreytHR
                 try {
@@ -95,7 +95,7 @@ app.post("/email-notification", async (req, res) => {
                     // TODO: Send error notification to employee
                 }
 
-                */
+
 
             } else {
                 console.log("⚠️ Incomplete leave request detected");

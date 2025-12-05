@@ -29,9 +29,11 @@ export async function processLeaveApplication(leaveRequest) {
 
         const employeeNo = employee.employeeId;
         const employeeName = employee.name;
+        const solitonEmployeeId = employee.employeeNo;
 
         console.log(`   Employee No: ${employeeNo}`);
         console.log(`   Employee Name: ${employeeName}`);
+        console.log(`   Soliton Employee ID: ${solitonEmployeeId}`);
 
         // Step 2: Prepare leave application with EXACT fields required by GreytHR
         console.log("\n📝 Step 2: Preparing leave application...");
@@ -52,7 +54,11 @@ export async function processLeaveApplication(leaveRequest) {
 
         // Step 3: Submit to GreytHR
         console.log("\n🚀 Step 3: Submitting to GreytHR...");
-        const result = await applyLeave(leaveApplication);
+        //const result = await applyLeave(leaveApplication);
+        const result = {
+            success: true,
+            message: "fake leave applied"
+        }
 
         console.log("\n" + "=".repeat(60));
         console.log("✅ Leave Application Successful!");
