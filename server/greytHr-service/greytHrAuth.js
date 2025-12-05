@@ -10,9 +10,6 @@ async function getGreytHRToken() {
         console.log("🔐 Authenticating with GreytHR...");
         console.log(`Authentication url: ${env.GREYTHR_AUTH_URL}/uas/v1/oauth2/client-token`);
 
-        // Create Basic Auth credentials
-        //const credentials = Buffer.from(`${env.GREYTHR_USERNAME}:${env.GREYTHR_PASSWORD}`).toString('base64');
-
         const response = await axios.post(
             `${env.GREYTHR_AUTH_URL}/uas/v1/oauth2/client-token`,
             {},
@@ -27,18 +24,6 @@ async function getGreytHRToken() {
             }
         );
 
-        /*
-        const response = await axios.post(
-            `${env.GREYTHR_AUTH_URL}/uas/v1/oauth2/client-token`,
-            {},  // Empty body
-            {
-                headers: {
-                    "Authorization": `Basic ${credentials}`,
-                    "Content-Type": "application/json"
-                }
-            }
-        );
-        */
         let accessToken = response.data.access_token
 
         console.log("✅ GreytHR authentication successful");
