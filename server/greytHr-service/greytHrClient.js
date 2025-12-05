@@ -47,13 +47,13 @@ async function greytHRRequest(method, endpoint, data = null) {
  */
 export async function getEmployeeByEmail(email) {
     try {
-        let email = "karthikeyan.balasubramanian@solitontech.in"
+        let email = "karthikeyan.balasubramanian@solitontech.com"
 
         console.log(`🔍 Fetching employee details for: ${email}`);
 
         const response = await greytHRRequest(
             "GET",
-            `/employee/v2/employees/lookup?q=${encodeURIComponent(email)}`
+            `employee/v2/employees/lookup?q=${encodeURIComponent(email)}`
         );
 
         if (response.data) {
