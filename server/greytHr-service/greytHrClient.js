@@ -13,7 +13,6 @@ async function greytHRRequest(method, endpoint, data = null) {
     try {
         const token = await getGreytHRToken();
 
-        console.log(`URL: ${env.GREYTHR_API_URL}${endpoint}`)
         const config = {
             method,
             url: `${env.GREYTHR_API_URL}${endpoint}`,
@@ -47,8 +46,6 @@ async function greytHRRequest(method, endpoint, data = null) {
  */
 export async function getEmployeeByEmail(email) {
     try {
-        let email = "karthikeyan.balasubramanian@solitontech.com"
-
         console.log(`🔍 Fetching employee details for: ${email}`);
 
         const response = await greytHRRequest(
@@ -59,6 +56,8 @@ export async function getEmployeeByEmail(email) {
         if (response.data) {
             console.log(`✅ Found employee: ${response.data.name}`);
             return response.data;
+        } else {
+            console.log(response);
         }
 
         throw new Error(`Employee not found with email: ${email}`);
