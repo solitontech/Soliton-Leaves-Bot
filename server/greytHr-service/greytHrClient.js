@@ -93,7 +93,7 @@ export async function applyLeave(leaveApplication) {
 
         const response = await greytHRRequest(
             "POST",
-            `/leave/v2/employee/transactions`,
+            `leave/v2/employee/transactions`,
             leaveApplication
         );
 
