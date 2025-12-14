@@ -89,8 +89,6 @@ export async function applyLeave(leaveApplication) {
         console.log("   To:", leaveApplication.toDate);
         console.log("   Reason:", leaveApplication.reason);
 
-        leaveApplication.leaveTypeDescription = "Recal Year"
-
         const response = await greytHRRequest(
             "POST",
             `leave/v2/employee/transactions`,
