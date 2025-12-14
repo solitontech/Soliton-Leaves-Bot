@@ -13,6 +13,9 @@ async function greytHRRequest(method, endpoint, data = null) {
     try {
         const token = await getGreytHRToken();
 
+        console.log(`URL: ${env.GREYTHR_API_URL}${endpoint}`);
+        console.log(`Domain: ${env.GREYTHR_DOMAIN}`);
+
         const config = {
             method,
             url: `${env.GREYTHR_API_URL}${endpoint}`,
@@ -85,6 +88,8 @@ export async function applyLeave(leaveApplication) {
         console.log("   From:", leaveApplication.fromDate);
         console.log("   To:", leaveApplication.toDate);
         console.log("   Reason:", leaveApplication.reason);
+
+        leaveApplication.leaveTypeDescription = "Recal Year"
 
         const response = await greytHRRequest(
             "POST",

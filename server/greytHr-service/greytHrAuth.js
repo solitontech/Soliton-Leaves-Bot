@@ -8,7 +8,6 @@ import env from "../env.js";
 async function getGreytHRToken() {
     try {
         console.log("🔐 Authenticating with GreytHR...");
-        console.log(`Authentication url: ${env.GREYTHR_AUTH_URL}/uas/v1/oauth2/client-token`);
 
         const response = await axios.post(
             `${env.GREYTHR_AUTH_URL}/uas/v1/oauth2/client-token`,
