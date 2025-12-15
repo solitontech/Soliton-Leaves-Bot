@@ -19,6 +19,7 @@ async function greytHRRequest(method, endpoint, data = null) {
         const config = {
             method,
             url: `${env.GREYTHR_API_URL}${endpoint}`,
+            maxBodyLength: Infinity,
             headers: {
                 "ACCESS-TOKEN": `${token}`,
                 "x-greythr-domain": env.GREYTHR_DOMAIN,
@@ -52,7 +53,7 @@ export async function getEmployeeByEmail(email) {
         console.log(`🔍 Fetching employee details for: ${email}`);
 
         const response = await greytHRRequest(
-            "GET",
+            "get",
             `employee/v2/employees/lookup?q=${encodeURIComponent(email)}`
         );
 
@@ -82,15 +83,10 @@ export async function getEmployeeByEmail(email) {
 export async function applyLeave(leaveApplication) {
     try {
         console.log("📝 Submitting leave application to GreytHR...");
-        console.log("   Employee No:", leaveApplication.employeeNo);
-        console.log("   Leave Type:", leaveApplication.leaveTypeDescription);
-        console.log("   Transaction:", leaveApplication.leaveTransactionTypeDescription);
-        console.log("   From:", leaveApplication.fromDate);
-        console.log("   To:", leaveApplication.toDate);
-        console.log("   Reason:", leaveApplication.reason);
+        console.log("   Leave Application:", leaveApplication);
 
         const response = await greytHRRequest(
-            "POST",
+            "post",
             `leave/v2/employee/transactions`,
             leaveApplication
         );
