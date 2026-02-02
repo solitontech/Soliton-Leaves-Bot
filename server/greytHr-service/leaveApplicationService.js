@@ -1,4 +1,5 @@
 import { getEmployeeByEmail, applyLeave } from "./greytHrClient.js";
+import logger from "../services/loggerService.js";
 
 /**
  * Process and submit a leave application
@@ -13,13 +14,10 @@ import { getEmployeeByEmail, applyLeave } from "./greytHrClient.js";
  */
 export async function processLeaveApplication(leaveRequest) {
     try {
-        console.log("\n" + "=".repeat(60));
-        console.log("🚀 Processing Leave Application");
-        console.log("=".repeat(60));
+        logger.processingLeaveApplicationHeader();
 
         // Step 1: Get employee details by email
-        console.log("\n👤 Step 1: Fetching employee details...");
-        console.log(`   Email: ${leaveRequest.fromEmail}`);
+        logger.stepFetchingEmployee(leaveRequest.fromEmail);
 
         const employee = await getEmployeeByEmail(leaveRequest.fromEmail);
 
@@ -31,17 +29,10 @@ export async function processLeaveApplication(leaveRequest) {
         const employeeName = employee.name;
         const solitonEmployeeId = employee.employeeNo;
 
-        console.log(`   Employee No: ${employeeNo}`);
-        console.log(`   Employee Name: ${employeeName}`);
-        console.log(`   Soliton Employee ID: ${solitonEmployeeId}`);
+        logger.employeeDetails(employeeNo, employeeName, solitonEmployeeId);
 
         // Step 2: Prepare leave application with EXACT fields required by GreytHR
-        console.log("\n📝 Step 2: Preparing leave application...");
-        console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-        console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   From: ${leaveRequest.fromDate}`);
-        console.log(`   To: ${leaveRequest.toDate}`);
-        console.log(`   Reason: ${leaveRequest.reason || "Leave request via email"}`);
+        logger.stepPreparingLeaveApplication(leaveRequest);
 
         const leaveApplication = {
             employeeNo: employeeNo,
@@ -53,17 +44,10 @@ export async function processLeaveApplication(leaveRequest) {
         };
 
         // Step 3: Submit to GreytHR
-        console.log("\n🚀 Step 3: Submitting to GreytHR...");
+        logger.stepSubmittingToGreytHR();
         const result = await applyLeave(leaveApplication);
 
-        console.log("\n" + "=".repeat(60));
-        console.log("✅ Leave Application Successful!");
-        console.log("=".repeat(60));
-        console.log(`   Employee: ${employeeName} (${employeeNo})`);
-        console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-        console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   Duration: ${leaveRequest.fromDate} to ${leaveRequest.toDate}`);
-        console.log("=".repeat(60) + "\n");
+        logger.leaveApplicationSuccessSummary(employeeName, employeeNo, leaveRequest);
 
         return {
             success: true,
@@ -83,11 +67,7 @@ export async function processLeaveApplication(leaveRequest) {
         };
 
     } catch (error) {
-        console.error("\n" + "=".repeat(60));
-        console.error("❌ Leave Application Failed!");
-        console.error("=".repeat(60));
-        console.error(`   Error: ${error.message}`);
-        console.error("=".repeat(60) + "\n");
+        logger.leaveApplicationFailureSummary(error.message);
 
         return {
             success: false,

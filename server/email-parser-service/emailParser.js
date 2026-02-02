@@ -2,6 +2,7 @@ import axios from "axios";
 import OpenAI from "openai";
 import { getLeaveRequestPrompt } from "./prompts.js";
 import env from "../env.js";
+import logger from "../services/loggerService.js";
 
 const openai = new OpenAI({
     apiKey: env.OPENAI_API_KEY,
@@ -22,7 +23,7 @@ async function parseLeaveRequest(emailData) {
             bodyPreview: emailData.bodyPreview || ""
         };
 
-        console.log("Parsing email from:", emailContent.from);
+        logger.parsingEmailFrom(emailContent.from);
 
         // Prepare the prompt for OpenAI
         const prompt = getLeaveRequestPrompt(emailContent);
@@ -36,7 +37,7 @@ async function parseLeaveRequest(emailData) {
 
         // Parse the response
         const aiResponse = response.output_text;
-        console.log("OpenAI Response:", aiResponse);
+        logger.openAIResponse(aiResponse);
 
         // Extract JSON from the response (in case there's extra text)
         let parsedData;
@@ -49,7 +50,7 @@ async function parseLeaveRequest(emailData) {
                 parsedData = JSON.parse(aiResponse);
             }
         } catch (parseError) {
-            console.error("Failed to parse OpenAI response as JSON:", parseError);
+            logger.error("Failed to parse OpenAI response as JSON:", parseError);
             throw new Error("Invalid response format from OpenAI");
         }
 
@@ -64,14 +65,14 @@ async function parseLeaveRequest(emailData) {
             confidence: parsedData.confidence || "low",
         };
 
-        console.log("Parsed leave request:", result);
+        logger.parsedLeaveRequest(result);
         return result;
 
     } catch (error) {
-        console.error("Error parsing leave request:", error.message);
+        logger.error("Error parsing leave request:", error.message);
 
         if (error.response) {
-            console.error("OpenAI API Error:", error.response.data);
+            logger.error("OpenAI API Error:", error.response.data);
             throw new Error(`OpenAI API Error: ${error.response.data.error?.message || "Unknown error"}`);
         }
 

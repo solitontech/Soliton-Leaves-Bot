@@ -5,6 +5,7 @@ import axios from "axios";
 import { parseLeaveRequest, validateLeaveRequest } from "./email-parser-service/emailParser.js";
 import { processLeaveApplication } from "./greytHr-service/leaveApplicationService.js";
 import env from "./env.js";
+import logger from "./services/loggerService.js";
 
 const app = express();
 app.use(bodyParser.json());
@@ -27,17 +28,16 @@ app.post("/api/messages", (req, res) => {
 
 // Email webhook — Microsoft Graph will POST here
 app.post("/email-notification", async (req, res) => {
-    console.log("📨 Received Graph notification");
+    logger.graphNotificationReceived();
 
     // Handle subscription validation
     if (req.query.validationToken) {
-        console.log("✅ Validation request received");
-        console.log("Validation token:", req.query.validationToken);
+        logger.graphValidationRequest(req.query.validationToken);
         // Microsoft Graph requires us to return the validation token with 200 OK
         return res.status(200).send(req.query.validationToken);
     }
 
-    console.log("Graph notification body:", req.body);
+    logger.graphNotificationBody(req.body);
     res.sendStatus(200);
 
     const notif = req.body.value?.[0];
@@ -52,53 +52,42 @@ app.post("/email-notification", async (req, res) => {
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log("Full email:", email.data);
+        logger.fullEmail(email.data);
 
         // Parse the email for leave request information
         try {
-            console.log("\n🔍 Parsing leave request from email...");
+            logger.parsingLeaveRequest();
             const leaveRequest = await parseLeaveRequest(email.data);
             const validation = validateLeaveRequest(leaveRequest);
 
             if (validation.isValid) {
-                console.log("✅ Valid leave request parsed:");
-                console.log(`   From: ${leaveRequest.fromEmail}`);
-                console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-                console.log(`   Transaction: ${leaveRequest.transaction}`);
-                console.log(`   Start Date: ${leaveRequest.fromDate}`);
-                console.log(`   To Date: ${leaveRequest.toDate}`);
-                console.log(`   Reason: ${leaveRequest.reason || "N/A"}`);
-                console.log(`   Confidence: ${leaveRequest.confidence}`);
+                logger.validLeaveRequestParsed(leaveRequest);
 
                 // Process the leave request with GreytHR
                 try {
-                    console.log("\n🚀 Submitting to GreytHR...");
+                    logger.submittingToGreytHR();
                     const result = await processLeaveApplication(leaveRequest);
 
                     if (result.success) {
-                        console.log("✅ Leave application submitted successfully!");
-                        console.log(`   Application ID: ${result.applicationId}`);
+                        logger.leaveApplicationSuccess(result.applicationId);
 
                         // TODO: Send confirmation email to employee
                         // TODO: Save to database for tracking
                     } else {
-                        console.error("❌ Leave application failed:");
-                        console.error(`   Error: ${result.error}`);
+                        logger.leaveApplicationFailed(result.error);
 
                         // TODO: Send error notification to employee
                     }
                 } catch (greytHrError) {
-                    console.error("❌ GreytHR integration error:", greytHrError.message);
+                    logger.error("❌ GreytHR integration error:", greytHrError.message);
                     // TODO: Send error notification to employee
                 }
 
             } else {
-                console.log("⚠️ Incomplete leave request detected");
-                console.log(`   Missing fields: ${validation.missingFields.join(", ")}`);
-                console.log(`   Confidence: ${validation.confidence}`);
+                logger.incompleteLeaveRequest(validation.missingFields, validation.confidence);
             }
         } catch (error) {
-            console.error("❌ Error parsing leave request:", error.message);
+            logger.error("❌ Error parsing leave request:", error.message);
         }
     }
 });
@@ -120,23 +109,16 @@ if (env.USE_HTTPS && env.SSL_KEY_PATH && env.SSL_CERT_PATH) {
 
         server = https.createServer(httpsOptions, app);
         server.listen(443, () => {
-            console.log(`✅ HTTPS Server listening on port 443`);
-            console.log(`🔒 SSL Certificate: ${env.SSL_CERT_PATH}`);
-            console.log(`🌐 Public URL: ${env.PUBLIC_URL}`);
+            logger.serverStartup(443, env.PUBLIC_URL, true, env.SSL_CERT_PATH);
         });
     } catch (error) {
-        console.error("❌ Failed to start HTTPS server:");
-        console.error("   Error:", error.message);
-        console.error("\n💡 Check that SSL certificate files exist and are readable:");
-        console.error(`   Key: ${env.SSL_KEY_PATH}`);
-        console.error(`   Cert: ${env.SSL_CERT_PATH}`);
+        logger.serverStartupFailed(error.message, env.SSL_KEY_PATH, env.SSL_CERT_PATH);
         process.exit(1);
     }
 } else {
     // HTTP mode (fallback)
     server = http.createServer(app);
     server.listen(80, () => {
-        console.log(`⚠️  HTTP Server listening on port 80`);
-        console.log(`🌐 Public URL: ${env.PUBLIC_URL}`);
+        logger.serverStartup(80, env.PUBLIC_URL, false);
     });
 }

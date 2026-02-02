@@ -1,5 +1,6 @@
 import axios from "axios";
 import env from "../env.js";
+import logger from "../services/loggerService.js";
 
 /**
  * Authenticate with GreytHR and get access token
@@ -7,7 +8,7 @@ import env from "../env.js";
  */
 async function getGreytHRToken() {
     try {
-        console.log("🔐 Authenticating with GreytHR...");
+        logger.greytHRAuthenticating();
 
         const response = await axios.post(
             `${env.GREYTHR_AUTH_URL}/uas/v1/oauth2/client-token`,
@@ -23,15 +24,15 @@ async function getGreytHRToken() {
             }
         );
 
-        let accessToken = response.data.access_token
+        let accessToken = response.data.access_token;
 
-        console.log("✅ GreytHR authentication successful");
+        logger.greytHRAuthSuccess();
         return accessToken;
 
     } catch (error) {
-        console.error("❌ GreytHR authentication failed:", error.message);
+        logger.error("❌ GreytHR authentication failed:", error.message);
         if (error.response) {
-            console.error("Response:", error.response.data);
+            logger.error("Response:", error.response.data);
         }
         throw new Error(`GreytHR authentication failed: ${error.message}`);
     }

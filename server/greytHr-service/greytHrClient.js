@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getGreytHRToken } from "./greytHrAuth.js";
 import env from "../env.js";
+import logger from "../services/loggerService.js";
 
 /**
  * Make an authenticated API request to GreytHR
@@ -13,8 +14,7 @@ async function greytHRRequest(method, endpoint, data = null) {
     try {
         const token = await getGreytHRToken();
 
-        console.log(`URL: ${env.GREYTHR_API_URL}${endpoint}`);
-        console.log(`Domain: ${env.GREYTHR_DOMAIN}`);
+        logger.greytHRRequestDetails(`${env.GREYTHR_API_URL}${endpoint}`, env.GREYTHR_DOMAIN);
 
         const config = {
             method,
@@ -34,11 +34,7 @@ async function greytHRRequest(method, endpoint, data = null) {
         const response = await axios(config);
         return response.data;
     } catch (error) {
-        console.error(`❌ GreytHR API request failed: ${method} ${endpoint}`);
-        if (error.response) {
-            console.error("Status:", error.response.status);
-            console.error("Response:", error.response.data);
-        }
+        logger.greytHRAPIRequestFailed(method, endpoint, error.response?.status, error.response?.data);
         throw error;
     }
 }
@@ -50,7 +46,7 @@ async function greytHRRequest(method, endpoint, data = null) {
  */
 export async function getEmployeeByEmail(email) {
     try {
-        console.log(`🔍 Fetching employee details for: ${email}`);
+        logger.fetchingEmployeeDetails(email);
 
         const response = await greytHRRequest(
             "get",
@@ -58,13 +54,13 @@ export async function getEmployeeByEmail(email) {
         );
 
         if (response.employeeId) {
-            console.log(`✅ Found employee: ${response.name}`);
+            logger.employeeFound(response.name);
             return response;
         }
 
         throw new Error(`Employee not found with email: ${email}`);
     } catch (error) {
-        console.error("❌ Failed to fetch employee:", error.message);
+        logger.error("❌ Failed to fetch employee:", error.message);
         throw error;
     }
 }
@@ -82,8 +78,7 @@ export async function getEmployeeByEmail(email) {
  */
 export async function applyLeave(leaveApplication) {
     try {
-        console.log("📝 Submitting leave application to GreytHR...");
-        console.log("   Leave Application:", leaveApplication);
+        logger.submittingLeaveApplication(leaveApplication);
 
         const response = await greytHRRequest(
             "post",
@@ -91,10 +86,10 @@ export async function applyLeave(leaveApplication) {
             leaveApplication
         );
 
-        console.log("✅ Leave application submitted successfully");
+        logger.leaveApplicationSubmitted();
         return response;
     } catch (error) {
-        console.error("❌ Failed to submit leave application:", error.message);
+        logger.error("❌ Failed to submit leave application:", error.message);
         throw error;
     }
 }
