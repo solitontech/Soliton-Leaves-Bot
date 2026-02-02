@@ -39,13 +39,13 @@ export async function processLeaveApplication(leaveRequest) {
         console.log("\n📝 Step 2: Preparing leave application...");
         console.log(`   Leave Type: ${leaveRequest.leaveType}`);
         console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   From: ${leaveRequest.toDate}`);
+        console.log(`   From: ${leaveRequest.fromDate}`);
         console.log(`   To: ${leaveRequest.toDate}`);
         console.log(`   Reason: ${leaveRequest.reason || "Leave request via email"}`);
 
         const leaveApplication = {
             employeeNo: employeeNo,
-            fromDate: leaveRequest.toDate,
+            fromDate: leaveRequest.fromDate,
             toDate: leaveRequest.toDate,
             leaveTypeDescription: leaveRequest.leaveType,
             leaveTransactionTypeDescription: leaveRequest.transaction,
@@ -62,7 +62,7 @@ export async function processLeaveApplication(leaveRequest) {
         console.log(`   Employee: ${employeeName} (${employeeNo})`);
         console.log(`   Leave Type: ${leaveRequest.leaveType}`);
         console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   Duration: ${leaveRequest.toDate} to ${leaveRequest.toDate}`);
+        console.log(`   Duration: ${leaveRequest.fromDate} to ${leaveRequest.toDate}`);
         console.log("=".repeat(60) + "\n");
 
         return {
@@ -75,7 +75,7 @@ export async function processLeaveApplication(leaveRequest) {
             leaveDetails: {
                 leaveType: leaveRequest.leaveType,
                 transaction: leaveRequest.transaction,
-                fromDate: leaveRequest.toDate,
+                fromDate: leaveRequest.fromDate,
                 toDate: leaveRequest.toDate,
                 reason: leaveRequest.reason,
             },
@@ -98,7 +98,7 @@ export async function processLeaveApplication(leaveRequest) {
             leaveDetails: {
                 leaveType: leaveRequest.leaveType,
                 transaction: leaveRequest.transaction,
-                fromDate: leaveRequest.toDate,
+                fromDate: leaveRequest.fromDate,
                 toDate: leaveRequest.toDate,
             },
         };

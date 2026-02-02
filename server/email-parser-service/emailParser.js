@@ -29,7 +29,7 @@ async function parseLeaveRequest(emailData) {
 
         // Call OpenAI API
         const response = await openai.responses.create({
-            model: "gpt-5-nano",
+            model: env.OPENAI_MODEL,
             input: prompt,
             store: true,
         });

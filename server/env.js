@@ -20,6 +20,7 @@ const env = {
 
     // OpenAI Configuration
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-5-nano',
 
     // Server Configuration
     PUBLIC_URL: process.env.PUBLIC_URL,
