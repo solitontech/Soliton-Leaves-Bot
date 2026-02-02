@@ -1,7 +1,7 @@
 import axios from "axios";
 import qs from "qs";
 import env from "../server/env.js";
-import type { GraphTokenResponse } from "../server/types/index.js";
+import type { GraphTokenResponse } from "../server/types/index.ts";
 
 async function getGraphToken(): Promise<string> {
     const url = `https://login.microsoftonline.com/${env.TENANT_ID}/oauth2/v2.0/token`;
