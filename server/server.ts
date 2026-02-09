@@ -62,8 +62,6 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        LOG.fullEmail(email.data);
-
         // Step 1: Fetch all emails in the conversation thread using the conversationId
         const conversationId = email.data.conversationId;
         LOG.info(`📧 Fetching email thread for conversation: ${conversationId}`);
@@ -90,10 +88,57 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             }
         }
 
-        // If no email with keywords found, fall back to the current email
+        // If no email with keywords found, send a reply to the conversation
         if (!leaveEmail) {
             LOG.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread`);
-            leaveEmail = email.data;
+
+            // Collect all unique participants from the thread
+            const participantEmails = new Set<string>();
+            threadMessages.forEach(msg => {
+                const senderEmail = msg.from?.emailAddress?.address;
+                if (senderEmail && senderEmail !== env.MONITORED_EMAIL) {
+                    participantEmails.add(senderEmail);
+                }
+            });
+
+            const recipients = Array.from(participantEmails).map(email => ({
+                emailAddress: { address: email }
+            }));
+
+            LOG.info(`📧 Sending no leave request found reply to ${recipients.length} participants: ${Array.from(participantEmails).join(', ')}`);
+
+            // Send a reply email to all participants in the conversation
+            try {
+                const replyMessage = {
+                    message: {
+                        subject: `RE: ${email.data.subject}`,
+                        body: {
+                            contentType: "HTML",
+                            content: `
+                                <p>Hello,</p>
+                                <p>I could not find a valid leave request in this email thread.</p>
+                                <p>This is an automated reply, please do not reply to this email.</p>
+                                <p>Please send a new email with a valid leave request</p>
+                                <p>Best regards,<br/>Leave Management AI</p>
+                            `
+                        },
+                        toRecipients: recipients
+                    }
+                };
+
+                await axios.post(
+                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
+                    replyMessage,
+                    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+                );
+
+                LOG.info(`✅ Sent reply to all participants in thread`);
+            } catch (replyError) {
+                const err = replyError as Error;
+                LOG.error("❌ Failed to send reply email:", err.message);
+            }
+
+            return;
         }
 
         // Step 3: Parse the specific email containing the leave request
