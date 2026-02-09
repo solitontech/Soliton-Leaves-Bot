@@ -1,13 +1,13 @@
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 import { getGreytHRToken } from "./greytHrAuth.js";
-import env from "../env.js";
-import logger from "../services/loggerService.js";
+import env from "../../env.js";
+import logger from "../loggerService.js";
 import type {
     HTTPMethod,
     GreytHREmployee,
     GreytHRLeaveApplication,
     GreytHROrgTree
-} from "../types/index.js";
+} from "../../types/index.js";
 
 /**
  * Make an authenticated API request to GreytHR

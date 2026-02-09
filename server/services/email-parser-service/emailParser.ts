@@ -1,15 +1,15 @@
 import axios, { AxiosError } from "axios";
 import OpenAI from "openai";
 import { getLeaveRequestPrompt } from "./prompts.js";
-import env from "../env.js";
-import logger from "../services/loggerService.js";
+import env from "../../env.js";
+import logger from "../loggerService.js";
 import type {
     EmailData,
     EmailContent,
     LeaveRequest,
     LeaveValidation,
     OpenAILeaveExtraction
-} from "../types/index.js";
+} from "../../types/index.js";
 
 const openai = new OpenAI({
     apiKey: env.OPENAI_API_KEY,

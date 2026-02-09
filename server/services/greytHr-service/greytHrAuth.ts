@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
-import env from "../env.js";
-import logger from "../services/loggerService.js";
-import type { GreytHRAuthResponse } from "../types/index.js";
+import env from "../../env.js";
+import logger from "../loggerService.js";
+import type { GreytHRAuthResponse } from "../../types/index.js";
 
 /**
  * Authenticate with GreytHR and get access token

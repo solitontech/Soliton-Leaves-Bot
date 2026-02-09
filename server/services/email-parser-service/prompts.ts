@@ -3,7 +3,7 @@
  * Contains AI prompts used for parsing leave requests from emails
  */
 
-import type { EmailContent } from '../types/index.js';
+import type { EmailContent } from '../../types/index.js';
 
 /**
  * Generate a prompt for extracting leave request information from email content
