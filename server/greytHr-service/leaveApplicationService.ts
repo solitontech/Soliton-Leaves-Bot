@@ -1,34 +1,30 @@
-import { getEmployeeByEmail, applyLeave } from "./greytHrClient.js";
+import { applyLeave } from "./greytHrClient.js";
 import logger from "../services/loggerService.js";
 import type {
     LeaveRequest,
     LeaveApplicationResult,
-    GreytHRLeaveApplication
+    GreytHRLeaveApplication,
+    GreytHREmployee
 } from "../types/index.js";
 
 /**
  * Process and submit a leave application
+ * @param leaveRequest - The parsed leave request
+ * @param employee - The employee details (already fetched to avoid duplicate lookup)
  */
-export async function processLeaveApplication(leaveRequest: LeaveRequest): Promise<LeaveApplicationResult> {
+export async function processLeaveApplication(
+    leaveRequest: LeaveRequest,
+    employee: GreytHREmployee
+): Promise<LeaveApplicationResult> {
     try {
         logger.processingLeaveApplicationHeader();
-
-        // Step 1: Get employee details by email
-        logger.stepFetchingEmployee(leaveRequest.fromEmail);
-
-        const employee = await getEmployeeByEmail(leaveRequest.fromEmail);
-
-        if (!employee) {
-            throw new Error(`Employee not found with email: ${leaveRequest.fromEmail}`);
-        }
 
         const employeeNo = employee.employeeId;
         const employeeName = employee.name;
         const solitonEmployeeId = employee.employeeNo;
 
-        logger.employeeDetails(employeeNo, employeeName, solitonEmployeeId);
-
         // Step 2: Prepare leave application with EXACT fields required by GreytHR
+        logger.employeeDetails(employeeNo, employeeName, solitonEmployeeId);
         logger.stepPreparingLeaveApplication(leaveRequest);
 
         // Ensure dates are not null before sending to GreytHR

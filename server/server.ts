@@ -13,7 +13,8 @@ import http from 'http';
 import fs from 'fs';
 import type {
     GraphNotificationPayload,
-    EmailData
+    EmailData,
+    GreytHREmployee
 } from "./types/index.js";
 
 const app = express();
@@ -152,10 +153,11 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         }
 
         let managerEmails: Set<string> = new Set();
+        let employee: GreytHREmployee;
 
         try {
             // 1. Get employee details by email
-            const employee = await getEmployeeByEmail(leaveRequesterEmail);
+            employee = await getEmployeeByEmail(leaveRequesterEmail);
             LOG.info(`✅ Found employee: ${employee.name} (ID: ${employee.employeeId})`);
 
             // 2. Get org tree to find all managers
@@ -295,7 +297,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                 // Process the leave request with GreytHR
                 try {
                     LOG.submittingToGreytHR();
-                    const result = await processLeaveApplication(leaveRequest);
+                    const result = await processLeaveApplication(leaveRequest, employee);
 
                     if (result.success) {
                         LOG.leaveApplicationSuccess(result.applicationId);
