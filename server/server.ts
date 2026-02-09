@@ -54,6 +54,9 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
     if (messageId) {
         const token = await getGraphToken();
+
+        // Fetch the current email to get the conversationId
+        // Note: We need this because the Graph notification doesn't include conversationId
         const email = await axios.get<EmailData>(
             `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
             { headers: { Authorization: `Bearer ${token}` } }
@@ -61,10 +64,42 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
         logger.fullEmail(email.data);
 
-        // Parse the email for leave request information
+        // Step 1: Fetch all emails in the conversation thread using the conversationId
+        const conversationId = email.data.conversationId;
+        logger.info(`📧 Fetching email thread for conversation: ${conversationId}`);
+
+        const threadResponse = await axios.get<{ value: EmailData[] }>(
+            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages?$filter=conversationId eq '${conversationId}'&$orderby=receivedDateTime desc`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const threadMessages = threadResponse.data.value;
+        logger.info(`📧 Found ${threadMessages.length} messages in thread`);
+
+        // Step 2: Search for the email containing "Leave Type" and "Transaction"
+        let leaveEmail: EmailData | null = null;
+
+        for (const msg of threadMessages) {
+            const emailBody = (msg.body?.content || msg.bodyPreview || "").toLowerCase();
+
+            // Check if this email contains both "leave type" and "transaction"
+            if (emailBody.includes("leave type") && emailBody.includes("transaction")) {
+                leaveEmail = msg;
+                logger.info(`✅ Found leave request email from: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
+                break;
+            }
+        }
+
+        // If no email with keywords found, fall back to the current email
+        if (!leaveEmail) {
+            logger.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread, using current email`);
+            leaveEmail = email.data;
+        }
+
+        // Step 3: Parse the specific email containing the leave request
         try {
             logger.parsingLeaveRequest();
-            const leaveRequest = await parseLeaveRequest(email.data);
+            const leaveRequest = await parseLeaveRequest(leaveEmail);
             const validation = validateLeaveRequest(leaveRequest);
 
             if (validation.isValid) {
@@ -77,18 +112,12 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
                     if (result.success) {
                         logger.leaveApplicationSuccess(result.applicationId);
-
-                        // TODO: Send confirmation email to employee
-                        // TODO: Save to database for tracking
                     } else {
                         logger.leaveApplicationFailed(result.error);
-
-                        // TODO: Send error notification to employee
                     }
                 } catch (greytHrError) {
                     const err = greytHrError as Error;
                     logger.error("❌ GreytHR integration error:", err.message);
-                    // TODO: Send error notification to employee
                 }
 
             } else {

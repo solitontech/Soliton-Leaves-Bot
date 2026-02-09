@@ -9,7 +9,7 @@ import type { EmailContent } from '../types/index.js';
  * Generate a prompt for extracting leave request information from email content
  */
 export function getLeaveRequestPrompt(emailContent: EmailContent): string {
-    return `You are an AI assistant that extracts leave request information from emails.
+  return `You are an AI assistant that extracts leave request information from emails.
 
 Analyze the following email and extract:
 1. From email address
