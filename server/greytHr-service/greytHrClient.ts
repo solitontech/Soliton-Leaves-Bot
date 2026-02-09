@@ -5,7 +5,8 @@ import logger from "../services/loggerService.js";
 import type {
     HTTPMethod,
     GreytHREmployee,
-    GreytHRLeaveApplication
+    GreytHRLeaveApplication,
+    GreytHROrgTree
 } from "../types/index.js";
 
 /**
@@ -96,3 +97,30 @@ export async function applyLeave(leaveApplication: GreytHRLeaveApplication): Pro
         throw error;
     }
 }
+
+/**
+ * Get employee's organizational tree
+ * @param employeeId - The employee's ID
+ * @returns Array of managers in the hierarchy, where:
+ *   - level 0 = direct manager
+ *   - level -1 = manager's manager
+ *   - level -2 = higher level manager, etc.
+ */
+export async function getEmployeeOrgTree(employeeId: string): Promise<GreytHROrgTree> {
+    try {
+        logger.info(`🌳 Fetching org tree for employee: ${employeeId}`);
+
+        const response = await greytHRRequest<GreytHROrgTree>(
+            "get",
+            `employee/v2/employees/${encodeURIComponent(employeeId)}/org-tree`
+        );
+
+        logger.info(`✅ Org tree fetched successfully for employee: ${employeeId}`);
+        return response;
+    } catch (error) {
+        const err = error as Error;
+        logger.error("❌ Failed to fetch employee org tree:", err.message);
+        throw error;
+    }
+}
+

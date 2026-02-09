@@ -108,6 +108,21 @@ export interface GreytHRAPIError {
     };
 }
 
+export interface GreytHRManager {
+    employeeId: number;
+    employeeNo: string;
+    name: string;
+}
+
+export interface GreytHROrgTreeNode {
+    manager: GreytHRManager;
+    level: number; // 0 = direct manager, -1 = manager's manager, -2 = higher level, etc.
+}
+
+export type GreytHROrgTree = GreytHROrgTreeNode[];
+
+
+
 // ============================================================================
 // Leave Application Result Types
 // ============================================================================
