@@ -185,6 +185,89 @@ async function getEmployeeAndManagerDetails(
     }
 }
 
+/**
+ * Check for manager approval in the email thread
+ * If no approval from an authorized manager is found, sends a reply email to all participants
+ * @param threadMessages - Array of emails in the thread
+ * @param leaveEmail - The leave request email to exclude from search
+ * @param managerEmails - Set of authorized manager email addresses
+ * @param participantEmails - Set of participant email addresses
+ * @param emailSubject - Original email subject for reply
+ * @param emailId - ID of the email to reply to
+ * @param token - Graph API access token
+ * @returns true if approval found from authorized manager, false otherwise (after sending notification)
+ */
+async function checkManagerApproval(
+    threadMessages: EmailData[],
+    leaveEmail: EmailData,
+    managerEmails: Set<string>,
+    participantEmails: Set<string>,
+    emailSubject: string,
+    emailId: string,
+    token: string
+): Promise<boolean> {
+    LOG.info(`🔍 Checking for approval from authorized managers...`);
+
+    for (const msg of threadMessages) {
+        // Skip the leave request email itself
+        if (msg.id === leaveEmail.id) continue;
+
+        const emailBody = (msg.body?.content || "").toLowerCase();
+        const approverEmail = msg.from?.emailAddress?.address?.toLowerCase();
+
+        // Check if this email contains approval keywords AND is from an authorized manager
+        if (emailBody.includes("approve") || emailBody.includes("approved")) {
+            if (approverEmail && managerEmails.has(approverEmail)) {
+                LOG.info(`✅ Found approval from authorized manager: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
+                return true; // ✅ Approval found
+            } else {
+                LOG.info(`⚠️  Found approval keyword from ${approverEmail}, but they are not an authorized manager - ignoring`);
+            }
+        }
+    }
+
+    // No approval found - send notification
+    LOG.info(`⚠️  No approval found in thread`);
+
+    const recipients = Array.from(participantEmails).map(email => ({
+        emailAddress: { address: email }
+    }));
+
+    LOG.info(`📧 Sending no approval found reply to ${recipients.length} participants: ${Array.from(participantEmails).join(', ')}`);
+
+    try {
+        const replyMessage = {
+            message: {
+                subject: `RE: ${emailSubject}`,
+                body: {
+                    contentType: "HTML",
+                    content: `
+                        <p>Hello,</p>
+                        <p>I found a leave request in this email thread, but no manager approval was given.</p>
+                        <p>This is an automated reply, please do not reply to this email.</p>
+                        <p>Please send an approval email to proceed with the leave request.</p>
+                        <p>Best regards,<br/>Leave Management AI</p>
+                    `
+                },
+                toRecipients: recipients
+            }
+        };
+
+        await axios.post(
+            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${emailId}/reply`,
+            replyMessage,
+            { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        );
+
+        LOG.info(`✅ Sent no approval reply to all participants in thread`);
+    } catch (replyError) {
+        const err = replyError as Error;
+        LOG.error("❌ Failed to send no approval reply email:", err.message);
+    }
+
+    return false; // ❌ No approval found
+}
+
 
 app.post("/api/messages", (req: Request, res: Response) => {
     adapter.process(req, res, async (context: TurnContext) => {
@@ -277,72 +360,21 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         const { employee, managerEmails } = employeeAndManagers;
 
         // Step 3: Check for approval in the thread from authorized managers
-        LOG.info(`🔍 Checking for approval from authorized managers...`);
-        let approvalFound = false;
-        let approvalEmail: EmailData | null = null;
+        // If no approval is found, checkManagerApproval will send a reply and return false
+        const approvalFound = await checkManagerApproval(
+            threadMessages,
+            leaveEmail,
+            managerEmails,
+            participantEmails,
+            email.data.subject,
+            email.data.id,
+            token
+        );
 
-        for (const msg of threadMessages) {
-            // Skip the leave request email itself
-            if (msg.id === leaveEmail.id) continue;
-
-            const emailBody = (msg.body?.content || "").toLowerCase();
-            const approverEmail = msg.from?.emailAddress?.address?.toLowerCase();
-
-            // Check if this email contains approval keywords AND is from an authorized manager
-            if (emailBody.includes("approve") || emailBody.includes("approved")) {
-                if (approverEmail && managerEmails.has(approverEmail)) {
-                    approvalFound = true;
-                    approvalEmail = msg;
-                    LOG.info(`✅ Found approval from authorized manager: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
-                    break;
-                } else {
-                    LOG.info(`⚠️  Found approval keyword from ${approverEmail}, but they are not an authorized manager - ignoring`);
-                }
-            }
-        }
-
-        // If no approval found, send notification and exit
         if (!approvalFound) {
-            LOG.info(`⚠️  No approval found in thread`);
-
-            const recipients = Array.from(participantEmails).map(email => ({
-                emailAddress: { address: email }
-            }));
-
-            LOG.info(`📧 Sending no approval found reply to ${recipients.length} participants: ${Array.from(participantEmails).join(', ')}`);
-
-            try {
-                const replyMessage = {
-                    message: {
-                        subject: `RE: ${email.data.subject}`,
-                        body: {
-                            contentType: "HTML",
-                            content: `
-                                <p>Hello,</p>
-                                <p>I found a leave request in this email thread, but no manager approval was given.</p>
-                                <p>This is an automated reply, please do not reply to this email.</p>
-                                <p>Please send an approval email to proceed with the leave request.</p>
-                                <p>Best regards,<br/>Leave Management AI</p>
-                            `
-                        },
-                        toRecipients: recipients
-                    }
-                };
-
-                await axios.post(
-                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
-                    replyMessage,
-                    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-                );
-
-                LOG.info(`✅ Sent no approval reply to all participants in thread`);
-            } catch (replyError) {
-                const err = replyError as Error;
-                LOG.error("❌ Failed to send no approval reply email:", err.message);
-            }
-
-            return;
+            return; // No approval notification already sent by checkManagerApproval
         }
+
 
         // Step 4: Parse the specific email containing the leave request
         try {
