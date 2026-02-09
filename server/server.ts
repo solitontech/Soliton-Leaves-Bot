@@ -27,6 +27,76 @@ const credentialFactory = new ConfigurationServiceClientCredentialFactory({
 
 const adapter = new CloudAdapter(credentialFactory as any);
 
+/**
+ * Search for the leave request email in a thread
+ * If not found, sends a reply email to all participants
+ * @param threadMessages - Array of emails in the thread
+ * @param participantEmails - Set of participant email addresses
+ * @param emailSubject - Original email subject for reply
+ * @param emailId - ID of the email to reply to
+ * @param token - Graph API access token
+ * @returns The email containing leave request, or null if not found
+ */
+async function getLeaveEmail(
+    threadMessages: EmailData[],
+    participantEmails: Set<string>,
+    emailSubject: string,
+    emailId: string,
+    token: string
+): Promise<EmailData | null> {
+    // Search for leave request email
+    for (const msg of threadMessages) {
+        const emailBody = (msg.body?.content || msg.bodyPreview || "").toLowerCase();
+
+        // Check if this email contains both "leave type" and "transaction"
+        if (emailBody.includes("leave type") && emailBody.includes("transaction")) {
+            LOG.info(`✅ Found leave request email from: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
+            return msg;
+        }
+    }
+
+    // No leave email found - send reply to all participants
+    LOG.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread`);
+
+    const recipients = Array.from(participantEmails).map(email => ({
+        emailAddress: { address: email }
+    }));
+
+    LOG.info(`📧 Sending no leave request found reply to ${recipients.length} participants: ${Array.from(participantEmails).join(', ')}`);
+
+    try {
+        const replyMessage = {
+            message: {
+                subject: `RE: ${emailSubject}`,
+                body: {
+                    contentType: "HTML",
+                    content: `
+                        <p>Hello,</p>
+                        <p>I could not find a valid leave request in this email thread.</p>
+                        <p>This is an automated reply, please do not reply to this email.</p>
+                        <p>Please send a new email with a valid leave request</p>
+                        <p>Best regards,<br/>Leave Management AI</p>
+                    `
+                },
+                toRecipients: recipients
+            }
+        };
+
+        await axios.post(
+            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${emailId}/reply`,
+            replyMessage,
+            { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        );
+
+        LOG.info(`✅ Sent reply to all participants in thread`);
+    } catch (replyError) {
+        const err = replyError as Error;
+        LOG.error("❌ Failed to send reply email:", err.message);
+    }
+
+    return null;
+}
+
 app.post("/api/messages", (req: Request, res: Response) => {
     adapter.process(req, res, async (context: TurnContext) => {
         await context.sendActivity("Email bot is running.");
@@ -76,20 +146,6 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         const threadMessages = threadResponse.data.value;
         LOG.info(`📧 Found ${threadMessages.length} messages in thread`);
 
-        // Step 2: Search for the email containing "Leave Type" and "Transaction"
-        let leaveEmail: EmailData | null = null;
-
-        for (const msg of threadMessages) {
-            const emailBody = (msg.body?.content || msg.bodyPreview || "").toLowerCase();
-
-            // Check if this email contains both "leave type" and "transaction"
-            if (emailBody.includes("leave type") && emailBody.includes("transaction")) {
-                leaveEmail = msg;
-                LOG.info(`✅ Found leave request email from: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
-                break;
-            }
-        }
-
         // Collect all unique participants from the thread
         const participantEmails = new Set<string>();
         threadMessages.forEach(msg => {
@@ -99,59 +155,24 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             }
         });
 
-        // If no email with keywords found, send a reply to the conversation
+        // Step 2: Search for the email containing "Leave Type" and "Transaction"
+        // If not found, getLeaveEmail will send a reply and return null
+        const leaveEmail = await getLeaveEmail(
+            threadMessages,
+            participantEmails,
+            email.data.subject,
+            email.data.id,
+            token
+        );
+
         if (!leaveEmail) {
-            LOG.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread`);
-
-            const recipients = Array.from(participantEmails).map(email => ({
-                emailAddress: { address: email }
-            }));
-
-            LOG.info(`📧 Sending no leave request found reply to ${recipients.length} participants: ${Array.from(participantEmails).join(', ')}`);
-
-            // Send a reply email to all participants in the conversation
-            try {
-                const replyMessage = {
-                    message: {
-                        subject: `RE: ${email.data.subject}`,
-                        body: {
-                            contentType: "HTML",
-                            content: `
-                                <p>Hello,</p>
-                                <p>I could not find a valid leave request in this email thread.</p>
-                                <p>This is an automated reply, please do not reply to this email.</p>
-                                <p>Please send a new email with a valid leave request</p>
-                                <p>Best regards,<br/>Leave Management AI</p>
-                            `
-                        },
-                        toRecipients: recipients
-                    }
-                };
-
-                await axios.post(
-                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
-                    replyMessage,
-                    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-                );
-
-                LOG.info(`✅ Sent reply to all participants in thread`);
-            } catch (replyError) {
-                const err = replyError as Error;
-                LOG.error("❌ Failed to send reply email:", err.message);
-            }
-
-            return;
+            return; // Reply already sent by getLeaveEmail
         }
 
         // Step 2.5: Get employee details and manager hierarchy
-        LOG.info(`👤 Fetching employee details for leave requester...`);
+        LOG.info(`👤 Fetching employee & manager details for leave requester...`);
 
         const leaveRequesterEmail = leaveEmail.from?.emailAddress?.address;
-        if (!leaveRequesterEmail) {
-            LOG.error("❌ Could not determine leave requester email");
-            return;
-        }
-
         let managerEmails: Set<string> = new Set();
         let employee: GreytHREmployee;
 
@@ -180,7 +201,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             LOG.info(`✅ Collected ${managerEmails.size} manager email addresses`);
         } catch (error) {
             const err = error as Error;
-            LOG.error(`❌ Failed to fetch employee/manager details: ${err.message}`);
+            LOG.error(`❌ Failed to fetch employee / manager details: ${err.message}`);
 
             // Send notification about the error
             const recipients = Array.from(participantEmails).map(email => ({
@@ -195,8 +216,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                             contentType: "HTML",
                             content: `
                                 <p>Hello,</p>
-                                <p>I found a leave request but could not verify the employee details in GreytHR.</p>
-                                <p>Error: ${err.message}</p>
+                                <p>I found a leave request but could not verify the employee details (or their manager's details) in GreytHR.</p>
                                 <p>This is an automated reply, please do not reply to this email.</p>
                                 <p>Best regards,<br/>Leave Management AI</p>
                             `
