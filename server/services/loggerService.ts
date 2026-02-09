@@ -334,5 +334,5 @@ class LoggerService {
 }
 
 // Export a singleton instance
-const logger = new LoggerService();
-export default logger;
+const LOG = new LoggerService();
+export default LOG;

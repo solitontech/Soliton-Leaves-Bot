@@ -5,7 +5,7 @@ import axios from "axios";
 import { parseLeaveRequest, validateLeaveRequest } from "./email-parser-service/emailParser.js";
 import { processLeaveApplication } from "./greytHr-service/leaveApplicationService.js";
 import env from "./env.js";
-import logger from "./services/loggerService.js";
+import LOG from "./services/loggerService.js";
 import { CloudAdapter, ConfigurationServiceClientCredentialFactory, TurnContext } from "botbuilder";
 import https from 'https';
 import http from 'http';
@@ -33,17 +33,17 @@ app.post("/api/messages", (req: Request, res: Response) => {
 
 // Email webhook — Microsoft Graph will POST here
 app.post("/email-notification", async (req: Request, res: Response) => {
-    logger.graphNotificationReceived();
+    LOG.graphNotificationReceived();
 
     // Handle subscription validation
     if (req.query['validationToken']) {
-        logger.graphValidationRequest(req.query['validationToken'] as string);
+        LOG.graphValidationRequest(req.query['validationToken'] as string);
         // Microsoft Graph requires us to return the validation token with 200 OK
         res.status(200).send(req.query['validationToken']);
         return;
     }
 
-    logger.graphNotificationBody(req.body);
+    LOG.graphNotificationBody(req.body);
     res.sendStatus(200);
 
     const body = req.body as GraphNotificationPayload;
@@ -62,11 +62,11 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        logger.fullEmail(email.data);
+        LOG.fullEmail(email.data);
 
         // Step 1: Fetch all emails in the conversation thread using the conversationId
         const conversationId = email.data.conversationId;
-        logger.info(`📧 Fetching email thread for conversation: ${conversationId}`);
+        LOG.info(`📧 Fetching email thread for conversation: ${conversationId}`);
 
         const threadResponse = await axios.get<{ value: EmailData[] }>(
             `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages?$filter=conversationId eq '${conversationId}'&$orderby=receivedDateTime desc`,
@@ -74,7 +74,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         );
 
         const threadMessages = threadResponse.data.value;
-        logger.info(`📧 Found ${threadMessages.length} messages in thread`);
+        LOG.info(`📧 Found ${threadMessages.length} messages in thread`);
 
         // Step 2: Search for the email containing "Leave Type" and "Transaction"
         let leaveEmail: EmailData | null = null;
@@ -85,47 +85,47 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             // Check if this email contains both "leave type" and "transaction"
             if (emailBody.includes("leave type") && emailBody.includes("transaction")) {
                 leaveEmail = msg;
-                logger.info(`✅ Found leave request email from: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
+                LOG.info(`✅ Found leave request email from: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
                 break;
             }
         }
 
         // If no email with keywords found, fall back to the current email
         if (!leaveEmail) {
-            logger.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread, using current email`);
+            LOG.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread`);
             leaveEmail = email.data;
         }
 
         // Step 3: Parse the specific email containing the leave request
         try {
-            logger.parsingLeaveRequest();
+            LOG.parsingLeaveRequest();
             const leaveRequest = await parseLeaveRequest(leaveEmail);
             const validation = validateLeaveRequest(leaveRequest);
 
             if (validation.isValid) {
-                logger.validLeaveRequestParsed(leaveRequest);
+                LOG.validLeaveRequestParsed(leaveRequest);
 
                 // Process the leave request with GreytHR
                 try {
-                    logger.submittingToGreytHR();
+                    LOG.submittingToGreytHR();
                     const result = await processLeaveApplication(leaveRequest);
 
                     if (result.success) {
-                        logger.leaveApplicationSuccess(result.applicationId);
+                        LOG.leaveApplicationSuccess(result.applicationId);
                     } else {
-                        logger.leaveApplicationFailed(result.error);
+                        LOG.leaveApplicationFailed(result.error);
                     }
                 } catch (greytHrError) {
                     const err = greytHrError as Error;
-                    logger.error("❌ GreytHR integration error:", err.message);
+                    LOG.error("❌ GreytHR integration error:", err.message);
                 }
 
             } else {
-                logger.incompleteLeaveRequest(validation.missingFields, validation.confidence);
+                LOG.incompleteLeaveRequest(validation.missingFields, validation.confidence);
             }
         } catch (error) {
             const err = error as Error;
-            logger.error("❌ Error parsing leave request:", err.message);
+            LOG.error("❌ Error parsing leave request:", err.message);
         }
     }
 });
@@ -143,17 +143,17 @@ if (env.USE_HTTPS && env.SSL_KEY_PATH && env.SSL_CERT_PATH) {
 
         server = https.createServer(httpsOptions, app);
         server.listen(443, () => {
-            logger.serverStartup(443, env.PUBLIC_URL, true, env.SSL_CERT_PATH);
+            LOG.serverStartup(443, env.PUBLIC_URL, true, env.SSL_CERT_PATH);
         });
     } catch (error) {
         const err = error as Error;
-        logger.serverStartupFailed(err.message, env.SSL_KEY_PATH!, env.SSL_CERT_PATH!);
+        LOG.serverStartupFailed(err.message, env.SSL_KEY_PATH!, env.SSL_CERT_PATH!);
         process.exit(1);
     }
 } else {
     // HTTP mode (fallback)
     server = http.createServer(app);
     server.listen(80, () => {
-        logger.serverStartup(80, env.PUBLIC_URL, false);
+        LOG.serverStartup(80, env.PUBLIC_URL, false);
     });
 }

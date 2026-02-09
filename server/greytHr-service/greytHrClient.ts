@@ -77,6 +77,34 @@ export async function getEmployeeByEmail(email: string): Promise<GreytHREmployee
 }
 
 /**
+ * Get employee details by employee ID
+ * @param employeeId - The employee's ID
+ * @returns Employee details
+ */
+export async function getEmployeeById(employeeId: string): Promise<GreytHREmployee> {
+    try {
+        logger.info(`👤 Fetching employee details for ID: ${employeeId}`);
+
+        const response = await greytHRRequest<GreytHREmployee>(
+            "get",
+            `employee/v2/employees/${encodeURIComponent(employeeId)}`
+        );
+
+        if (response.employeeId) {
+            logger.employeeFound(response.name);
+            return response;
+        }
+
+        throw new Error(`Employee not found with ID: ${employeeId}`);
+    } catch (error) {
+        const err = error as Error;
+        logger.error("❌ Failed to fetch employee by ID:", err.message);
+        throw error;
+    }
+}
+
+
+/**
  * Apply for leave
  */
 export async function applyLeave(leaveApplication: GreytHRLeaveApplication): Promise<any> {
