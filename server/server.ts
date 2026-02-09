@@ -97,6 +97,95 @@ async function getLeaveEmail(
     return null;
 }
 
+/**
+ * Get employee and manager details from GreytHR
+ * If an error occurs, sends a reply email to all participants
+ * @param leaveRequesterEmail - Email address of the leave requester
+ * @param participantEmails - Set of participant email addresses
+ * @param emailSubject - Original email subject for reply
+ * @param emailId - ID of the email to reply to
+ * @param token - Graph API access token
+ * @returns Object with employee and managerEmails, or null if error occurred
+ */
+async function getEmployeeAndManagerDetails(
+    leaveRequesterEmail: string,
+    participantEmails: Set<string>,
+    emailSubject: string,
+    emailId: string,
+    token: string
+): Promise<{ employee: GreytHREmployee; managerEmails: Set<string> } | null> {
+    LOG.info(`👤 Fetching employee & manager details for leave requester...`);
+
+    const managerEmails: Set<string> = new Set();
+
+    try {
+        // 1. Get employee details by email
+        const employee = await getEmployeeByEmail(leaveRequesterEmail);
+        LOG.info(`✅ Found employee: ${employee.name} (ID: ${employee.employeeId})`);
+
+        // 2. Get org tree to find all managers
+        const orgTree = await getEmployeeOrgTree(employee.employeeId);
+        LOG.info(`🌳 Found ${orgTree.length} managers in org tree`);
+
+        // 3. Get email addresses for each manager
+        for (const node of orgTree) {
+            try {
+                const managerDetails = await getEmployeeById(node.manager.employeeId.toString());
+                if (managerDetails.email) {
+                    managerEmails.add(managerDetails.email.toLowerCase());
+                    LOG.info(`  📋 Manager: ${managerDetails.name} (${managerDetails.email}) - Level ${node.level}`);
+                }
+            } catch (error) {
+                LOG.error(`⚠️  Could not fetch details for manager ID: ${node.manager.employeeId}`);
+            }
+        }
+
+        LOG.info(`✅ Collected ${managerEmails.size} manager email addresses`);
+
+        return { employee, managerEmails };
+
+    } catch (error) {
+        const err = error as Error;
+        LOG.error(`❌ Failed to fetch employee / manager details: ${err.message}`);
+
+        // Send notification about the error
+        const recipients = Array.from(participantEmails).map(email => ({
+            emailAddress: { address: email }
+        }));
+
+        try {
+            const replyMessage = {
+                message: {
+                    subject: `RE: ${emailSubject}`,
+                    body: {
+                        contentType: "HTML",
+                        content: `
+                            <p>Hello,</p>
+                            <p>I found a leave request but could not verify the employee details (or their manager's details) in GreytHR.</p>
+                            <p>This is an automated reply, please do not reply to this email.</p>
+                            <p>Best regards,<br/>Leave Management AI</p>
+                        `
+                    },
+                    toRecipients: recipients
+                }
+            };
+
+            await axios.post(
+                `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${emailId}/reply`,
+                replyMessage,
+                { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+            );
+
+            LOG.info(`✅ Sent error notification to all participants`);
+        } catch (replyError) {
+            LOG.error("❌ Failed to send error notification email");
+        }
+
+        return null;
+    }
+}
+
+
 app.post("/api/messages", (req: Request, res: Response) => {
     adapter.process(req, res, async (context: TurnContext) => {
         await context.sendActivity("Email bot is running.");
@@ -170,72 +259,22 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         }
 
         // Step 2.5: Get employee details and manager hierarchy
-        LOG.info(`👤 Fetching employee & manager details for leave requester...`);
-
+        // If an error occurs, getEmployeeAndManagerDetails will send a reply and return null
         const leaveRequesterEmail = leaveEmail.from?.emailAddress?.address;
-        let managerEmails: Set<string> = new Set();
-        let employee: GreytHREmployee;
 
-        try {
-            // 1. Get employee details by email
-            employee = await getEmployeeByEmail(leaveRequesterEmail);
-            LOG.info(`✅ Found employee: ${employee.name} (ID: ${employee.employeeId})`);
+        const employeeAndManagers = await getEmployeeAndManagerDetails(
+            leaveRequesterEmail,
+            participantEmails,
+            email.data.subject,
+            email.data.id,
+            token
+        );
 
-            // 2. Get org tree to find all managers
-            const orgTree = await getEmployeeOrgTree(employee.employeeId);
-            LOG.info(`🌳 Found ${orgTree.length} managers in org tree`);
-
-            // 3. Get email addresses for each manager
-            for (const node of orgTree) {
-                try {
-                    const managerDetails = await getEmployeeById(node.manager.employeeId.toString());
-                    if (managerDetails.email) {
-                        managerEmails.add(managerDetails.email.toLowerCase());
-                        LOG.info(`  📋 Manager: ${managerDetails.name} (${managerDetails.email}) - Level ${node.level}`);
-                    }
-                } catch (error) {
-                    LOG.error(`⚠️  Could not fetch details for manager ID: ${node.manager.employeeId}`);
-                }
-            }
-
-            LOG.info(`✅ Collected ${managerEmails.size} manager email addresses`);
-        } catch (error) {
-            const err = error as Error;
-            LOG.error(`❌ Failed to fetch employee / manager details: ${err.message}`);
-
-            // Send notification about the error
-            const recipients = Array.from(participantEmails).map(email => ({
-                emailAddress: { address: email }
-            }));
-
-            try {
-                const replyMessage = {
-                    message: {
-                        subject: `RE: ${email.data.subject}`,
-                        body: {
-                            contentType: "HTML",
-                            content: `
-                                <p>Hello,</p>
-                                <p>I found a leave request but could not verify the employee details (or their manager's details) in GreytHR.</p>
-                                <p>This is an automated reply, please do not reply to this email.</p>
-                                <p>Best regards,<br/>Leave Management AI</p>
-                            `
-                        },
-                        toRecipients: recipients
-                    }
-                };
-
-                await axios.post(
-                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
-                    replyMessage,
-                    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-                );
-            } catch (replyError) {
-                LOG.error("❌ Failed to send error notification email");
-            }
-
-            return;
+        if (!employeeAndManagers) {
+            return; // Error notification already sent by getEmployeeAndManagerDetails
         }
+
+        const { employee, managerEmails } = employeeAndManagers;
 
         // Step 3: Check for approval in the thread from authorized managers
         LOG.info(`🔍 Checking for approval from authorized managers...`);
