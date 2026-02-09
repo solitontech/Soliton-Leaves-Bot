@@ -14,7 +14,8 @@ import fs from 'fs';
 import type {
     GraphNotificationPayload,
     EmailData,
-    GreytHREmployee
+    GreytHREmployee,
+    LeaveRequest
 } from "./types/index.js";
 
 const app = express();
@@ -268,6 +269,187 @@ async function checkManagerApproval(
     return false; // ❌ No approval found
 }
 
+/**
+ * Send failure notification email when leave application fails or encounters an error
+ * @param participantEmails - Set of participant email addresses
+ * @param emailSubject - Original email subject for reply
+ * @param emailId - ID of the email to reply to
+ * @param token - Graph API access token
+ */
+async function sendLeaveApplicationFailureEmail(
+    participantEmails: Set<string>,
+    emailSubject: string,
+    emailId: string,
+    token: string
+): Promise<void> {
+    const recipients = Array.from(participantEmails).map(email => ({
+        emailAddress: { address: email }
+    }));
+
+    LOG.info(`📧 Sending failure notification to ${recipients.length} participants...`);
+
+    try {
+        const failureMessage = {
+            message: {
+                subject: `RE: ${emailSubject}`,
+                body: {
+                    contentType: "HTML",
+                    content: `
+                        <p>Hello,</p>
+                        <p><strong>❌ Leave application failed</strong></p>
+                        <p>There was an error while submitting your leave application to GreytHR.</p>
+                        <p>Please upload request manually or contact IT support if the issue persists.</p>
+                        <p>This is an automated notification. Please do not reply to this email.</p>
+                        <p>Best regards,<br/>Leave Management AI</p>
+                    `
+                },
+                toRecipients: recipients
+            }
+        };
+
+        await axios.post(
+            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${emailId}/reply`,
+            failureMessage,
+            { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        );
+
+        LOG.info(`✅ Failure notification sent to all participants`);
+    } catch (emailError) {
+        LOG.error(`⚠️  Failed to send failure notification email`);
+    }
+}
+
+/**
+ * Send parsing/validation error notification email when leave request cannot be parsed or is incomplete
+ * @param participantEmails - Set of participant email addresses
+ * @param emailSubject - Original email subject for reply
+ * @param emailId - ID of the email to reply to
+ * @param token - Graph API access token
+ * @param missingFields - Optional array of missing field names
+ */
+async function sendLeaveRequestParsingErrorEmail(
+    participantEmails: Set<string>,
+    emailSubject: string,
+    emailId: string,
+    token: string,
+    missingFields?: string[]
+): Promise<void> {
+    const recipients = Array.from(participantEmails).map(email => ({
+        emailAddress: { address: email }
+    }));
+
+    LOG.info(`📧 Sending parsing/validation error notification to ${recipients.length} participants...`);
+
+    try {
+        const errorMessage = {
+            message: {
+                subject: `RE: ${emailSubject}`,
+                body: {
+                    contentType: "HTML",
+                    content: `
+                        <p>Hello,</p>
+                        <p><strong>❌ Unable to process leave request</strong></p>
+                        <p>I could not extract valid leave request information from the email.</p>
+                        ${missingFields && missingFields.length > 0 ? `
+                        <p><strong>Missing fields:</strong></p>
+                        <ul>
+                            ${missingFields.map(field => `<li>${field}</li>`).join('')}
+                        </ul>
+                        ` : ''}
+                        <p><strong>Please ensure your leave request includes all required fields:</strong></p>
+                        <ul>
+                            <li>Leave Type (e.g., Sick Leave, Casual Leave, Privilege Leave)</li>
+                            <li>Transaction (Availed or Cancelled)</li>
+                            <li>From Date (start date of leave)</li>
+                            <li>To Date (end date of leave)</li>
+                        </ul>
+                        <p>Please submit a new leave request with all the required information.</p>
+                        <p>This is an automated notification. Please do not reply to this email.</p>
+                        <p>Best regards,<br/>Leave Management AI</p>
+                    `
+                },
+                toRecipients: recipients
+            }
+        };
+
+        await axios.post(
+            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${emailId}/reply`,
+            errorMessage,
+            { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        );
+
+        LOG.info(`✅ Parsing/validation error notification sent to all participants`);
+    } catch (emailError) {
+        LOG.error(`⚠️  Failed to send parsing/validation error notification email`);
+    }
+}
+
+
+/**
+ * Parse and validate leave request from email
+ * If parsing fails or validation fails, sends a reply email to all participants
+ * @param leaveEmail - The leave request email to parse
+ * @param participantEmails - Set of participant email addresses
+ * @param emailSubject - Original email subject for reply
+ * @param emailId - Email ID to reply to
+ * @param token - Graph API access token
+ * @returns LeaveRequest if successfully parsed and validated, null otherwise (after sending notification)
+ */
+async function parseAndValidateLeaveRequest(
+    leaveEmail: EmailData,
+    participantEmails: Set<string>,
+    emailSubject: string,
+    emailId: string,
+    token: string
+): Promise<LeaveRequest | null> {
+    LOG.info(`📝 Parsing leave request from email...`);
+
+    // Try to parse the leave request
+    let leaveRequest: LeaveRequest | null = null;
+    try {
+        leaveRequest = await parseLeaveRequest(leaveEmail);
+    } catch (error) {
+        const err = error as Error;
+        LOG.error(`❌ Error parsing leave request: ${err.message}`);
+        await sendLeaveRequestParsingErrorEmail(
+            participantEmails,
+            emailSubject,
+            emailId,
+            token
+        );
+        return null;
+    }
+
+    // Check if parsing returned data
+    if (!leaveRequest) {
+        LOG.error(`❌ No leave request data after parsing`);
+        await sendLeaveRequestParsingErrorEmail(
+            participantEmails,
+            emailSubject,
+            emailId,
+            token
+        );
+        return null;
+    }
+
+    // Validate the parsed leave request
+    const validation = validateLeaveRequest(leaveRequest);
+
+    if (!validation.isValid) {
+        LOG.error(`❌ Incomplete leave request - missing required fields`);
+        await sendLeaveRequestParsingErrorEmail(
+            participantEmails,
+            emailSubject,
+            emailId,
+            token,
+            validation.missingFields
+        );
+        return null;
+    }
+
+    LOG.info(`✅ Valid leave request parsed successfully`);
+    return leaveRequest;
+}
 
 app.post("/api/messages", (req: Request, res: Response) => {
     adapter.process(req, res, async (context: TurnContext) => {
@@ -375,37 +557,88 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             return; // No approval notification already sent by checkManagerApproval
         }
 
+        // Step 4: Parse and validate the leave request
+        // If parsing/validation fails, parseAndValidateLeaveRequest will send a reply and return null
+        const leaveRequest = await parseAndValidateLeaveRequest(
+            leaveEmail,
+            participantEmails,
+            email.data.subject,
+            email.data.id,
+            token
+        );
 
-        // Step 4: Parse the specific email containing the leave request
+        if (!leaveRequest) {
+            return; // Error notification already sent by parseAndValidateLeaveRequest
+        }
+
+
+        // Step 5: Process the leave request with GreytHR
         try {
-            LOG.parsingLeaveRequest();
-            const leaveRequest = await parseLeaveRequest(leaveEmail);
-            const validation = validateLeaveRequest(leaveRequest);
+            LOG.info(`🚀 Submitting leave application to GreytHR...`);
+            const result = await processLeaveApplication(leaveRequest, employee);
 
-            if (validation.isValid) {
-                LOG.validLeaveRequestParsed(leaveRequest);
+            if (result.success) {
+                LOG.info(`✅ Leave application submitted successfully!`);
 
-                // Process the leave request with GreytHR
+                // Send success notification email
+                const recipients = Array.from(participantEmails).map(email => ({
+                    emailAddress: { address: email }
+                }));
+
+                LOG.info(`📧 Sending success notification to ${recipients.length} participants...`);
+
                 try {
-                    LOG.submittingToGreytHR();
-                    const result = await processLeaveApplication(leaveRequest, employee);
+                    const successMessage = {
+                        message: {
+                            subject: `RE: ${email.data.subject}`,
+                            body: {
+                                contentType: "HTML",
+                                content: `
+                                            <p>Hello,</p>
+                                            <p><strong>✅ Leave application submitted successfully!</strong></p>
+                                            <p><strong>Employee:</strong> ${employee.name} (${employee.employeeNo})</p>
+                                            <p><strong>Leave Type:</strong> ${leaveRequest.leaveType}</p>
+                                            <p><strong>Transaction:</strong> ${leaveRequest.transaction}</p>
+                                            <p><strong>Duration:</strong> ${leaveRequest.fromDate} to ${leaveRequest.toDate}</p>
+                                            ${leaveRequest.reason ? `<p><strong>Reason:</strong> ${leaveRequest.reason}</p>` : ''}
+                                            ${result.applicationId ? `<p><strong>Application ID:</strong> ${result.applicationId}</p>` : ''}
+                                            <p>This is an automated confirmation. Please do not reply to this email.</p>
+                                            <p>Best regards,<br/>Leave Management AI</p>
+                                        `
+                            },
+                            toRecipients: recipients
+                        }
+                    };
 
-                    if (result.success) {
-                        LOG.leaveApplicationSuccess(result.applicationId);
-                    } else {
-                        LOG.leaveApplicationFailed(result.error);
-                    }
-                } catch (greytHrError) {
-                    const err = greytHrError as Error;
-                    LOG.error("❌ GreytHR integration error:", err.message);
+                    await axios.post(
+                        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
+                        successMessage,
+                        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+                    );
+
+                    LOG.info(`✅ Success notification sent to all participants`);
+                } catch (emailError) {
+                    LOG.error(`⚠️  Failed to send success notification email (but leave was submitted)`);
                 }
 
             } else {
-                LOG.incompleteLeaveRequest(validation.missingFields, validation.confidence);
+                LOG.error(`❌ Leave application failed!`);
+                await sendLeaveApplicationFailureEmail(
+                    participantEmails,
+                    email.data.subject,
+                    email.data.id,
+                    token
+                );
             }
-        } catch (error) {
-            const err = error as Error;
-            LOG.error("❌ Error parsing leave request:", err.message);
+        } catch (greytHrError) {
+            const err = greytHrError as Error;
+            LOG.error(`❌ GreytHR integration error: ${err.message}`);
+            await sendLeaveApplicationFailureEmail(
+                participantEmails,
+                email.data.subject,
+                email.data.id,
+                token
+            );
         }
     }
 });
