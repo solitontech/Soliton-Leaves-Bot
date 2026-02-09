@@ -4,6 +4,7 @@ import getGraphToken from "../graph-authentication/graphAuth.js";
 import axios from "axios";
 import { parseLeaveRequest, validateLeaveRequest } from "./email-parser-service/emailParser.js";
 import { processLeaveApplication } from "./greytHr-service/leaveApplicationService.js";
+import { getEmployeeByEmail, getEmployeeById, getEmployeeOrgTree } from "./greytHr-service/greytHrClient.js";
 import env from "./env.js";
 import LOG from "./services/loggerService.js";
 import { CloudAdapter, ConfigurationServiceClientCredentialFactory, TurnContext } from "botbuilder";
@@ -88,18 +89,18 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             }
         }
 
+        // Collect all unique participants from the thread
+        const participantEmails = new Set<string>();
+        threadMessages.forEach(msg => {
+            const senderEmail = msg.from?.emailAddress?.address;
+            if (senderEmail && senderEmail !== env.MONITORED_EMAIL) {
+                participantEmails.add(senderEmail);
+            }
+        });
+
         // If no email with keywords found, send a reply to the conversation
         if (!leaveEmail) {
             LOG.info(`⚠️  No email with "Leave Type" and "Transaction" found in thread`);
-
-            // Collect all unique participants from the thread
-            const participantEmails = new Set<string>();
-            threadMessages.forEach(msg => {
-                const senderEmail = msg.from?.emailAddress?.address;
-                if (senderEmail && senderEmail !== env.MONITORED_EMAIL) {
-                    participantEmails.add(senderEmail);
-                }
-            });
 
             const recipients = Array.from(participantEmails).map(email => ({
                 emailAddress: { address: email }
@@ -141,7 +142,148 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             return;
         }
 
-        // Step 3: Parse the specific email containing the leave request
+        // Step 2.5: Get employee details and manager hierarchy
+        LOG.info(`👤 Fetching employee details for leave requester...`);
+
+        const leaveRequesterEmail = leaveEmail.from?.emailAddress?.address;
+        if (!leaveRequesterEmail) {
+            LOG.error("❌ Could not determine leave requester email");
+            return;
+        }
+
+        let managerEmails: Set<string> = new Set();
+
+        try {
+            // 1. Get employee details by email
+            const employee = await getEmployeeByEmail(leaveRequesterEmail);
+            LOG.info(`✅ Found employee: ${employee.name} (ID: ${employee.employeeId})`);
+
+            // 2. Get org tree to find all managers
+            const orgTree = await getEmployeeOrgTree(employee.employeeId);
+            LOG.info(`🌳 Found ${orgTree.length} managers in org tree`);
+
+            // 3. Get email addresses for each manager
+            for (const node of orgTree) {
+                try {
+                    const managerDetails = await getEmployeeById(node.manager.employeeId.toString());
+                    if (managerDetails.email) {
+                        managerEmails.add(managerDetails.email.toLowerCase());
+                        LOG.info(`  📋 Manager: ${managerDetails.name} (${managerDetails.email}) - Level ${node.level}`);
+                    }
+                } catch (error) {
+                    LOG.error(`⚠️  Could not fetch details for manager ID: ${node.manager.employeeId}`);
+                }
+            }
+
+            LOG.info(`✅ Collected ${managerEmails.size} manager email addresses`);
+        } catch (error) {
+            const err = error as Error;
+            LOG.error(`❌ Failed to fetch employee/manager details: ${err.message}`);
+
+            // Send notification about the error
+            const recipients = Array.from(participantEmails).map(email => ({
+                emailAddress: { address: email }
+            }));
+
+            try {
+                const replyMessage = {
+                    message: {
+                        subject: `RE: ${email.data.subject}`,
+                        body: {
+                            contentType: "HTML",
+                            content: `
+                                <p>Hello,</p>
+                                <p>I found a leave request but could not verify the employee details in GreytHR.</p>
+                                <p>Error: ${err.message}</p>
+                                <p>This is an automated reply, please do not reply to this email.</p>
+                                <p>Best regards,<br/>Leave Management AI</p>
+                            `
+                        },
+                        toRecipients: recipients
+                    }
+                };
+
+                await axios.post(
+                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
+                    replyMessage,
+                    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+                );
+            } catch (replyError) {
+                LOG.error("❌ Failed to send error notification email");
+            }
+
+            return;
+        }
+
+        // Step 3: Check for approval in the thread from authorized managers
+        LOG.info(`🔍 Checking for approval from authorized managers...`);
+        let approvalFound = false;
+        let approvalEmail: EmailData | null = null;
+
+        for (const msg of threadMessages) {
+            // Skip the leave request email itself
+            if (msg.id === leaveEmail.id) continue;
+
+            const emailBody = (msg.body?.content || "").toLowerCase();
+            const approverEmail = msg.from?.emailAddress?.address?.toLowerCase();
+
+            // Check if this email contains approval keywords AND is from an authorized manager
+            if (emailBody.includes("approve") || emailBody.includes("approved")) {
+                if (approverEmail && managerEmails.has(approverEmail)) {
+                    approvalFound = true;
+                    approvalEmail = msg;
+                    LOG.info(`✅ Found approval from authorized manager: ${msg.from?.emailAddress?.address} at ${msg.receivedDateTime}`);
+                    break;
+                } else {
+                    LOG.info(`⚠️  Found approval keyword from ${approverEmail}, but they are not an authorized manager - ignoring`);
+                }
+            }
+        }
+
+        // If no approval found, send notification and exit
+        if (!approvalFound) {
+            LOG.info(`⚠️  No approval found in thread`);
+
+            const recipients = Array.from(participantEmails).map(email => ({
+                emailAddress: { address: email }
+            }));
+
+            LOG.info(`📧 Sending no approval found reply to ${recipients.length} participants: ${Array.from(participantEmails).join(', ')}`);
+
+            try {
+                const replyMessage = {
+                    message: {
+                        subject: `RE: ${email.data.subject}`,
+                        body: {
+                            contentType: "HTML",
+                            content: `
+                                <p>Hello,</p>
+                                <p>I found a leave request in this email thread, but no manager approval was given.</p>
+                                <p>This is an automated reply, please do not reply to this email.</p>
+                                <p>Please send an approval email to proceed with the leave request.</p>
+                                <p>Best regards,<br/>Leave Management AI</p>
+                            `
+                        },
+                        toRecipients: recipients
+                    }
+                };
+
+                await axios.post(
+                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
+                    replyMessage,
+                    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+                );
+
+                LOG.info(`✅ Sent no approval reply to all participants in thread`);
+            } catch (replyError) {
+                const err = replyError as Error;
+                LOG.error("❌ Failed to send no approval reply email:", err.message);
+            }
+
+            return;
+        }
+
+        // Step 4: Parse the specific email containing the leave request
         try {
             LOG.parsingLeaveRequest();
             const leaveRequest = await parseLeaveRequest(leaveEmail);
