@@ -114,8 +114,9 @@ Soliton-Leaves-Bot/
 1. **Email Monitoring**: The bot subscribes to a mailbox using Microsoft Graph API
 2. **Webhook Notifications**: When a new email arrives, Microsoft Graph sends a notification to `/email-notification`
 3. **AI Parsing**: The email content is sent to OpenAI for extraction of leave details
-4. **Validation**: Extracted data is validated for completeness
-5. **Processing**: Valid leave requests are processed (ready for GreytHR integration)
+4. **Employee Lookup**: Employee details are fetched from GreytHR using the sender's email
+5. **Direct Submission**: Leave request is immediately submitted to GreytHR
+6. **Notification**: Sender receives confirmation or error notification via email
 
 ## 🤖 API Endpoints
 

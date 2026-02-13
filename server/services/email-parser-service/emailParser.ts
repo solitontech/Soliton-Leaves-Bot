@@ -71,6 +71,14 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
         };
 
         logger.parsedLeaveRequest(result);
+
+        // Validate required fields
+        const validation = validateLeaveRequest(result);
+        if (!validation.isValid) {
+            logger.error(`Missing required fields: ${validation.missingFields.join(', ')}`);
+            throw new MissingFieldsError(validation.missingFields);
+        }
+
         return result;
 
     } catch (error) {
@@ -90,18 +98,37 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
  * Validate if the parsed data contains all required fields
  */
 export function validateLeaveRequest(parsedData: LeaveRequest): LeaveValidation {
-    const requiredFields: (keyof LeaveRequest)[] = ["fromEmail", "fromDate", "toDate", "leaveType", "transaction"];
     const missingFields: string[] = [];
 
-    for (const field of requiredFields) {
-        if (!parsedData[field]) {
-            missingFields.push(field);
-        }
-    }
+    // Map of field names to user-friendly names
+    const fieldLabels: Record<string, string> = {
+        fromDate: "From Date",
+        toDate: "To Date",
+        leaveType: "Leave Type",
+        transaction: "Transaction Type (availed/cancelled)"
+    };
+
+    if (!parsedData.fromDate) missingFields.push(fieldLabels['fromDate']!);
+    if (!parsedData.toDate) missingFields.push(fieldLabels['toDate']!);
+    if (!parsedData.leaveType) missingFields.push(fieldLabels['leaveType']!);
+    if (!parsedData.transaction) missingFields.push(fieldLabels['transaction']!);
 
     return {
         isValid: missingFields.length === 0,
         missingFields,
         confidence: parsedData.confidence
     };
+}
+
+/**
+ * Custom error class for missing required fields
+ */
+export class MissingFieldsError extends Error {
+    public missingFields: string[];
+
+    constructor(missingFields: string[]) {
+        super(`Missing required fields: ${missingFields.join(', ')}`);
+        this.name = 'MissingFieldsError';
+        this.missingFields = missingFields;
+    }
 }

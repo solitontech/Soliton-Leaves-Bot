@@ -5,8 +5,7 @@ import logger from "../loggerService.js";
 import type {
     HTTPMethod,
     GreytHREmployee,
-    GreytHRLeaveApplication,
-    GreytHROrgTree
+    GreytHRLeaveApplication
 } from "../../types/index.js";
 
 /**
@@ -77,34 +76,6 @@ export async function getEmployeeByEmail(email: string): Promise<GreytHREmployee
 }
 
 /**
- * Get employee details by employee ID
- * @param employeeId - The employee's ID
- * @returns Employee details
- */
-export async function getEmployeeById(employeeId: string): Promise<GreytHREmployee> {
-    try {
-        logger.info(`👤 Fetching employee details for ID: ${employeeId}`);
-
-        const response = await greytHRRequest<GreytHREmployee>(
-            "get",
-            `employee/v2/employees/${encodeURIComponent(employeeId)}`
-        );
-
-        if (response.employeeId) {
-            logger.employeeFound(response.name);
-            return response;
-        }
-
-        throw new Error(`Employee not found with ID: ${employeeId}`);
-    } catch (error) {
-        const err = error as Error;
-        logger.error("❌ Failed to fetch employee by ID:", err.message);
-        throw error;
-    }
-}
-
-
-/**
  * Apply for leave
  */
 export async function applyLeave(leaveApplication: GreytHRLeaveApplication): Promise<any> {
@@ -122,32 +93,6 @@ export async function applyLeave(leaveApplication: GreytHRLeaveApplication): Pro
     } catch (error) {
         const err = error as Error;
         logger.error("❌ Failed to submit leave application:", err.message);
-        throw error;
-    }
-}
-
-/**
- * Get employee's organizational tree
- * @param employeeId - The employee's ID
- * @returns Array of managers in the hierarchy, where:
- *   - level 0 = direct manager
- *   - level -1 = manager's manager
- *   - level -2 = higher level manager, etc.
- */
-export async function getEmployeeOrgTree(employeeId: string): Promise<GreytHROrgTree> {
-    try {
-        logger.info(`🌳 Fetching org tree for employee: ${employeeId}`);
-
-        const response = await greytHRRequest<GreytHROrgTree>(
-            "get",
-            `employee/v2/employees/${encodeURIComponent(employeeId)}/org-tree`
-        );
-
-        logger.info(`✅ Org tree fetched successfully for employee: ${employeeId}`);
-        return response;
-    } catch (error) {
-        const err = error as Error;
-        logger.error("❌ Failed to fetch employee org tree:", err.message);
         throw error;
     }
 }

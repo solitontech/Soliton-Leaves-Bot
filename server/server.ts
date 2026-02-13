@@ -2,7 +2,15 @@ import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import getGraphToken from "../graph-authentication/graphAuth.js";
 import axios from "axios";
-import { processLeaveApplication, getEmployeeAndManagerDetails, checkManagerApproval, parseAndValidateLeaveRequest, getLeaveEmail, sendLeaveApplicationFailureEmail } from "./services/leaveApplicationService.js";
+import { processLeaveApplication } from "./services/leaveApplicationService.js";
+import { parseLeaveRequest, MissingFieldsError } from "./services/email-parser-service/emailParser.js";
+import { getEmployeeByEmail } from "./services/greytHr-service/greytHrClient.js";
+import {
+    sendSuccessNotification,
+    sendFailureNotification,
+    sendErrorNotification,
+    sendMissingFieldsNotification
+} from "./services/notificationService.js";
 import env from "./env.js";
 import LOG from "./services/loggerService.js";
 import { CloudAdapter, ConfigurationServiceClientCredentialFactory, TurnContext } from "botbuilder";
@@ -23,7 +31,6 @@ const credentialFactory = new ConfigurationServiceClientCredentialFactory({
 });
 
 const adapter = new CloudAdapter(credentialFactory as any);
-
 
 app.post("/api/messages", (req: Request, res: Response) => {
     adapter.process(req, res, async (context: TurnContext) => {
@@ -53,166 +60,88 @@ app.post("/email-notification", async (req: Request, res: Response) => {
     const messageId = notif.resourceData?.id;
 
     if (messageId) {
-        const token = await getGraphToken();
-
-        // Fetch the current email to get the conversationId
-        // Note: We need this because the Graph notification doesn't include conversationId
-        const email = await axios.get<EmailData>(
-            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        // Step 1: Fetch all emails in the conversation thread using the conversationId
-        const conversationId = email.data.conversationId;
-        LOG.info(`📧 Fetching email thread for conversation: ${conversationId}`);
-
-        const threadResponse = await axios.get<{ value: EmailData[] }>(
-            `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages?$filter=conversationId eq '${conversationId}'&$orderby=receivedDateTime desc`,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        const threadMessages = threadResponse.data.value;
-        LOG.info(`📧 Found ${threadMessages.length} messages in thread`);
-
-        // Collect all unique participants from the thread
-        const participantEmails = new Set<string>();
-        threadMessages.forEach(msg => {
-            const senderEmail = msg.from?.emailAddress?.address;
-            if (senderEmail && senderEmail !== env.MONITORED_EMAIL) {
-                participantEmails.add(senderEmail);
-            }
-        });
-
-        // Step 2: Search for the email containing "Leave Type" and "Transaction"
-        // If not found, getLeaveEmail will send a reply and return null
-        const leaveEmail = await getLeaveEmail(
-            threadMessages,
-            participantEmails,
-            email.data.subject,
-            email.data.id,
-            token
-        );
-
-        if (!leaveEmail) {
-            return; // Reply already sent by getLeaveEmail
-        }
-
-        // Step 2.5: Get employee details and manager hierarchy
-        // If an error occurs, getEmployeeAndManagerDetails will send a reply and return null
-        const leaveRequesterEmail = leaveEmail.from?.emailAddress?.address;
-
-        const employeeAndManagers = await getEmployeeAndManagerDetails(
-            leaveRequesterEmail,
-            participantEmails,
-            email.data.subject,
-            email.data.id,
-            token
-        );
-
-        if (!employeeAndManagers) {
-            return; // Error notification already sent by getEmployeeAndManagerDetails
-        }
-
-        const { employee, managerEmails } = employeeAndManagers;
-
-        // Step 3: Check for approval in the thread from authorized managers
-        // If no approval is found, checkManagerApproval will send a reply and return false
-        const approvalFound = await checkManagerApproval(
-            threadMessages,
-            leaveEmail,
-            managerEmails,
-            participantEmails,
-            email.data.subject,
-            email.data.id,
-            token
-        );
-
-        if (!approvalFound) {
-            return; // No approval notification already sent by checkManagerApproval
-        }
-
-        // Step 4: Parse and validate the leave request
-        // If parsing/validation fails, parseAndValidateLeaveRequest will send a reply and return null
-        const leaveRequest = await parseAndValidateLeaveRequest(
-            leaveEmail,
-            participantEmails,
-            email.data.subject,
-            email.data.id,
-            token
-        );
-
-        if (!leaveRequest) {
-            return; // Error notification already sent by parseAndValidateLeaveRequest
-        }
-
-
-        // Step 5: Process the leave request with GreytHR
         try {
+            const token = await getGraphToken();
+
+            // Fetch the email that triggered the notification
+            LOG.info(`📧 Fetching email: ${messageId}`);
+            const emailResponse = await axios.get<EmailData>(
+                `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const email = emailResponse.data;
+            const senderEmail = email.from?.emailAddress?.address;
+
+            if (!senderEmail) {
+                LOG.error(`❌ No sender email found in message`);
+                return;
+            }
+            LOG.info(`📧 Processing leave request from: ${senderEmail}`);
+
+            // Step 1: Parse and validate the leave request from the email
+            LOG.info(`🤖 Parsing leave request with AI...`);
+            const leaveRequest = await parseLeaveRequest(email);
+
+            // Step 2: Get employee details from GreytHR
+            LOG.info(`👤 Fetching employee details from GreytHR...`);
+            const employee = await getEmployeeByEmail(senderEmail);
+
+            // Step 3: Submit leave application to GreytHR
             LOG.info(`🚀 Submitting leave application to GreytHR...`);
             const result = await processLeaveApplication(leaveRequest, employee);
 
+            // Step 4: Send notification email
             if (result.success) {
                 LOG.info(`✅ Leave application submitted successfully!`);
-
-                // Send success notification email
-                const recipients = Array.from(participantEmails).map(email => ({
-                    emailAddress: { address: email }
-                }));
-
-                LOG.info(`📧 Sending success notification to ${recipients.length} participants...`);
-
-                try {
-                    const successMessage = {
-                        message: {
-                            subject: `RE: ${email.data.subject}`,
-                            body: {
-                                contentType: "HTML",
-                                content: `
-                                            <p>Hello,</p>
-                                            <p><strong>✅ Leave application submitted successfully!</strong></p>
-                                            <p><strong>Employee:</strong> ${employee.name} (${employee.employeeNo})</p>
-                                            <p><strong>Leave Type:</strong> ${leaveRequest.leaveType}</p>
-                                            <p><strong>Transaction:</strong> ${leaveRequest.transaction}</p>
-                                            <p><strong>Duration:</strong> ${leaveRequest.fromDate} to ${leaveRequest.toDate}</p>
-                                            ${leaveRequest.reason ? `<p><strong>Reason:</strong> ${leaveRequest.reason}</p>` : ''}
-                                            ${result.applicationId ? `<p><strong>Application ID:</strong> ${result.applicationId}</p>` : ''}
-                                            <p>This is an automated confirmation. Please do not reply to this email.</p>
-                                            <p>Best regards,<br/>Leave Management AI</p>
-                                        `
-                            },
-                            toRecipients: recipients
-                        }
-                    };
-
-                    await axios.post(
-                        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.data.id}/reply`,
-                        successMessage,
-                        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-                    );
-
-                    LOG.info(`✅ Success notification sent to all participants`);
-                } catch (emailError) {
-                    LOG.error(`⚠️  Failed to send success notification email (but leave was submitted)`);
-                }
-
+                await sendSuccessNotification(email, senderEmail, employee, leaveRequest, token);
             } else {
                 LOG.error(`❌ Leave application failed!`);
-                await sendLeaveApplicationFailureEmail(
-                    participantEmails,
-                    email.data.subject,
-                    email.data.id,
-                    token
-                );
+                await sendFailureNotification(email, senderEmail, employee, result, token);
             }
-        } catch (greytHrError) {
-            const err = greytHrError as Error;
-            LOG.error(`❌ GreytHR integration error: ${err.message}`);
-            await sendLeaveApplicationFailureEmail(
-                participantEmails,
-                email.data.subject,
-                email.data.id,
-                token
-            );
+        } catch (error) {
+            const err = error as Error;
+
+            // Handle missing fields error specifically
+            if (err instanceof MissingFieldsError) {
+                LOG.error(`❌ Missing required fields: ${err.missingFields.join(', ')}`);
+                try {
+                    const token = await getGraphToken();
+                    const emailResponse = await axios.get<EmailData>(
+                        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    const email = emailResponse.data;
+                    const senderEmail = email.from?.emailAddress?.address;
+                    if (senderEmail) {
+                        await sendMissingFieldsNotification(email, senderEmail, err.missingFields, token);
+                    }
+                } catch (notificationError) {
+                    LOG.error(`⚠️  Failed to send missing fields notification`);
+                }
+                return;
+            }
+
+            // Handle other errors
+            LOG.error(`❌ Error processing email notification: ${err.message}`);
+
+            // Try to send error notification if we have enough context
+            try {
+                const token = await getGraphToken();
+                const emailResponse = await axios.get<EmailData>(
+                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                const email = emailResponse.data;
+                const senderEmail = email.from?.emailAddress?.address;
+
+                if (senderEmail) {
+                    await sendErrorNotification(email, senderEmail, err.message, token);
+                }
+            } catch (notificationError) {
+                LOG.error(`⚠️  Failed to send error notification`);
+            }
         }
     }
 });
