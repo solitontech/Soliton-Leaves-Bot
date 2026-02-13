@@ -61,13 +61,15 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
 
         // Validate and return the parsed data
         const result: LeaveRequest = {
-            fromEmail: parsedData.fromEmail || emailContent.from,
+            fromEmail: emailContent.from,
             fromDate: parsedData.fromDate || null,
             toDate: parsedData.toDate || parsedData.endDate || null,
             leaveType: parsedData.leaveType || null,
-            transaction: parsedData.transaction || "availed",
+            transaction: parsedData.transaction,
             reason: parsedData.reason || null,
             confidence: parsedData.confidence || "low",
+            fromSession: parsedData.fromSession ? parseInt(String(parsedData.fromSession), 10) : null,
+            toSession: parsedData.toSession ? parseInt(String(parsedData.toSession), 10) : null,
         };
 
         logger.parsedLeaveRequest(result);

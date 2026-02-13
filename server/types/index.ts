@@ -67,6 +67,8 @@ export interface LeaveRequest {
     transaction: TransactionType;
     reason: string | null;
     confidence: ConfidenceLevel;
+    fromSession?: number | null;
+    toSession?: number | null;
 }
 
 export interface LeaveValidation {
@@ -93,6 +95,8 @@ export interface GreytHRLeaveApplication {
     leaveTypeDescription: LeaveType;
     leaveTransactionTypeDescription: TransactionType;
     reason: string;
+    fromSession?: number;
+    toSession?: number;
 }
 
 export interface GreytHRAuthResponse {
@@ -140,6 +144,8 @@ export interface LeaveApplicationSuccess {
         fromDate: string | null;
         toDate: string | null;
         reason: string | null;
+        fromSession?: number | null;
+        toSession?: number | null;
     };
     greytHRResponse: any;
     applicationId?: string;
@@ -156,6 +162,8 @@ export interface LeaveApplicationFailure {
         transaction: TransactionType;
         fromDate: string | null;
         toDate: string | null;
+        fromSession?: number | null;
+        toSession?: number | null;
     };
 }
 
@@ -209,6 +217,8 @@ export interface OpenAILeaveExtraction {
     transaction: TransactionType;
     reason: string | null;
     confidence: ConfidenceLevel;
+    fromSession?: number | null;
+    toSession?: number | null;
 }
 
 // ============================================================================

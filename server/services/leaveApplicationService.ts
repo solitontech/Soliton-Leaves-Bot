@@ -28,8 +28,8 @@ export async function processLeaveApplication(
         logger.stepPreparingLeaveApplication(leaveRequest);
 
         // Ensure dates are not null before sending to GreytHR
-        if (!leaveRequest.fromDate || !leaveRequest.toDate || !leaveRequest.leaveType) {
-            throw new Error("Missing required leave details: fromDate, toDate, or leaveType");
+        if (!leaveRequest.fromDate || !leaveRequest.toDate || !leaveRequest.leaveType || !leaveRequest.transaction) {
+            throw new Error("Missing required leave details: fromDate, toDate, or leaveType or transaction");
         }
 
         const leaveApplication: GreytHRLeaveApplication = {
@@ -40,6 +40,14 @@ export async function processLeaveApplication(
             leaveTransactionTypeDescription: leaveRequest.transaction,
             reason: leaveRequest.reason || "Leave request via email"
         };
+
+        // Add optional session fields if present
+        if (leaveRequest.fromSession !== null && leaveRequest.fromSession !== undefined) {
+            leaveApplication.fromSession = leaveRequest.fromSession;
+        }
+        if (leaveRequest.toSession !== null && leaveRequest.toSession !== undefined) {
+            leaveApplication.toSession = leaveRequest.toSession;
+        }
 
         // Step 3: Submit to GreytHR
         logger.stepSubmittingToGreytHR();
@@ -60,6 +68,8 @@ export async function processLeaveApplication(
                 fromDate: leaveRequest.fromDate,
                 toDate: leaveRequest.toDate,
                 reason: leaveRequest.reason,
+                fromSession: leaveRequest.fromSession,
+                toSession: leaveRequest.toSession
             },
             greytHRResponse: result,
         };
@@ -79,6 +89,8 @@ export async function processLeaveApplication(
                 transaction: leaveRequest.transaction,
                 fromDate: leaveRequest.fromDate,
                 toDate: leaveRequest.toDate,
+                fromSession: leaveRequest.fromSession,
+                toSession: leaveRequest.toSession
             },
         };
     }
