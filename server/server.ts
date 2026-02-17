@@ -77,6 +77,13 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                 LOG.error(`❌ No sender email found in message`);
                 return;
             }
+
+            // prevent infinite loops: Ignore emails sent by the bot itself
+            if (senderEmail.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
+                LOG.info(`⏩ Ignoring email from self (${senderEmail}) to prevent infinite loop.`);
+                return;
+            }
+
             LOG.info(`📧 Processing leave request from: ${senderEmail}`);
 
             // Step 1: Parse and validate the leave request from the email
