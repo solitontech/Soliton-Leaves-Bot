@@ -26,6 +26,7 @@ const env: EnvironmentConfig = {
 
     // Server Configuration
     PUBLIC_URL: process.env['PUBLIC_URL']!,
+    PORT: process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3978,
     USE_HTTPS: process.env['USE_HTTPS'] === 'true',
 
     // Monitored Email

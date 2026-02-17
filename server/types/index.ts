@@ -239,6 +239,7 @@ export interface EnvironmentConfig {
 
     // Server Configuration
     PUBLIC_URL: string;
+    PORT: number;
     USE_HTTPS: boolean;
 
     // Monitored Email

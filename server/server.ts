@@ -158,8 +158,8 @@ if (env.USE_HTTPS && env.SSL_KEY_PATH && env.SSL_CERT_PATH) {
         };
 
         server = https.createServer(httpsOptions, app);
-        server.listen(443, () => {
-            LOG.serverStartup(443, env.PUBLIC_URL, true, env.SSL_CERT_PATH);
+        server.listen(env.PORT, () => {
+            LOG.serverStartup(env.PORT, env.PUBLIC_URL, true, env.SSL_CERT_PATH);
         });
     } catch (error) {
         const err = error as Error;
@@ -169,7 +169,7 @@ if (env.USE_HTTPS && env.SSL_KEY_PATH && env.SSL_CERT_PATH) {
 } else {
     // HTTP mode (fallback)
     server = http.createServer(app);
-    server.listen(80, () => {
-        LOG.serverStartup(80, env.PUBLIC_URL, false);
+    server.listen(env.PORT, () => {
+        LOG.serverStartup(env.PORT, env.PUBLIC_URL, false);
     });
 }
