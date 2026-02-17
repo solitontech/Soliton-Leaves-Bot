@@ -33,7 +33,7 @@ export async function processLeaveApplication(
         }
 
         const leaveApplication: GreytHRLeaveApplication = {
-            employeeNo: employeeNo,
+            employeeNo: solitonEmployeeId,
             fromDate: leaveRequest.fromDate,
             toDate: leaveRequest.toDate,
             leaveTypeDescription: leaveRequest.leaveType,
