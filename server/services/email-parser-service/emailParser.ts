@@ -16,9 +16,10 @@ const openai = new OpenAI({
 });
 
 /**
- * Parse email content to extract leave request details
+ * Parse email content to extract one or more leave request details.
+ * Returns an array — a single email may contain multiple leave requests.
  */
-export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequest> {
+export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequest[]> {
     try {
         // Extract relevant email information
         const emailContent: EmailContent = {
@@ -44,44 +45,63 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
         const aiResponse: string = response.output_text;
         logger.openAIResponse(aiResponse);
 
-        // Extract JSON from the response (in case there's extra text)
-        let parsedData: OpenAILeaveExtraction;
+        // Extract JSON array from the response (in case there's extra text)
+        let parsedItems: OpenAILeaveExtraction[];
         try {
-            // Try to find JSON in the response
-            const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                parsedData = JSON.parse(jsonMatch[0]);
+            const arrayMatch = aiResponse.match(/\[[\s\S]*\]/);
+            if (arrayMatch) {
+                parsedItems = JSON.parse(arrayMatch[0]);
             } else {
-                parsedData = JSON.parse(aiResponse);
+                // Fallback: if the model returned a single object, wrap it
+                const objectMatch = aiResponse.match(/\{[\s\S]*\}/);
+                parsedItems = objectMatch ? [JSON.parse(objectMatch[0])] : JSON.parse(aiResponse);
+            }
+            if (!Array.isArray(parsedItems)) {
+                parsedItems = [parsedItems];
             }
         } catch (parseError) {
             logger.error("Failed to parse OpenAI response as JSON:", parseError);
             throw new Error("Invalid response format from OpenAI");
         }
 
-        // Validate and return the parsed data
-        const result: LeaveRequest = {
-            fromEmail: emailContent.from,
-            fromDate: parsedData.fromDate || null,
-            toDate: parsedData.toDate || parsedData.endDate || null,
-            leaveType: parsedData.leaveType || null,
-            transaction: parsedData.transaction,
-            reason: parsedData.reason || null,
-            confidence: parsedData.confidence || "low",
-            fromSession: parsedData.fromSession ? parseInt(String(parsedData.fromSession), 10) : null,
-            toSession: parsedData.toSession ? parseInt(String(parsedData.toSession), 10) : null,
-        };
+        logger.info(`🗓️  AI identified ${parsedItems.length} leave request(s) in the email`);
 
-        logger.parsedLeaveRequest(result);
+        // Map, validate, and collect results
+        const results: LeaveRequest[] = [];
+        const allMissingFields: string[] = [];
 
-        // Validate required fields
-        const validation = validateLeaveRequest(result);
-        if (!validation.isValid) {
-            logger.error(`Missing required fields: ${validation.missingFields.join(', ')}`);
-            throw new MissingFieldsError(validation.missingFields);
+        for (let i = 0; i < parsedItems.length; i++) {
+            const parsedData = parsedItems[i]!;
+            const result: LeaveRequest = {
+                fromEmail: emailContent.from,
+                fromDate: parsedData.fromDate || null,
+                toDate: parsedData.toDate || parsedData.endDate || null,
+                leaveType: parsedData.leaveType || null,
+                transaction: parsedData.transaction,
+                reason: parsedData.reason || null,
+                confidence: parsedData.confidence || "low",
+                fromSession: parsedData.fromSession ? parseInt(String(parsedData.fromSession), 10) : null,
+                toSession: parsedData.toSession ? parseInt(String(parsedData.toSession), 10) : null,
+            };
+
+            logger.parsedLeaveRequest(result);
+
+            const validation = validateLeaveRequest(result);
+            if (!validation.isValid) {
+                const prefix = parsedItems.length > 1 ? `Leave request ${i + 1}: ` : "";
+                allMissingFields.push(...validation.missingFields.map(f => `${prefix}${f}`));
+            } else {
+                results.push(result);
+            }
         }
 
-        return result;
+        // If any leave request had missing fields, throw for ALL of them together
+        if (allMissingFields.length > 0) {
+            logger.error(`Missing required fields: ${allMissingFields.join(', ')}`);
+            throw new MissingFieldsError(allMissingFields);
+        }
+
+        return results;
 
     } catch (error) {
         const err = error as AxiosError<any> | Error;
@@ -95,6 +115,7 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
         throw error;
     }
 }
+
 
 /**
  * Validate if the parsed data contains all required fields

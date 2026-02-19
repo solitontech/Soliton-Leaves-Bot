@@ -11,7 +11,9 @@ import type { EmailContent } from '../../types/index.js';
 export function getLeaveRequestPrompt(emailContent: EmailContent): string {
   return `You are an AI assistant that extracts leave request information from emails.
 
-Analyze the following email and extract:
+Analyze the following email and extract ALL leave requests mentioned. An employee may request multiple leaves in a single email (e.g., different date ranges, different leave types, or multiple individual days).
+
+For each leave request extract:
 1. From email address
 2. Type of leave request (e.g., Sick Leave, Casual Leave, Privilege Leave, Comp off, etc.)
 3. Leave dates (from date and to date)
@@ -25,18 +27,20 @@ From: ${emailContent.from}
 Subject: ${emailContent.subject}
 Body: ${emailContent.bodyPreview || emailContent.body}
 
-Please respond ONLY with a valid JSON object in the following format:
-{
-  "fromEmail": "email@example.com",
-  "fromDate": "YYYY-MM-DD",
-  "toDate": "YYYY-MM-DD",
-  "leaveType": "type of leave",
-  "transaction": "availed or cancelled",
-  "reason": "reason for leave if mentioned",
-  "fromSession": 1 or 2 or null,
-  "toSession": 1 or 2 or null,
-  "confidence": "high/medium/low"
-}
+Please respond ONLY with a valid JSON array. Even if there is only one leave request, wrap it in an array.
+[
+  {
+    "fromEmail": "email@example.com",
+    "fromDate": "YYYY-MM-DD",
+    "toDate": "YYYY-MM-DD",
+    "leaveType": "type of leave",
+    "transaction": "availed or cancelled",
+    "reason": "reason for leave if mentioned",
+    "fromSession": 1 or 2 or null,
+    "toSession": 1 or 2 or null,
+    "confidence": "high/medium/low"
+  }
+]
 
 Important:
 - transaction should be "availed" for applying for leave, or "cancelled" for cancelling a leave
