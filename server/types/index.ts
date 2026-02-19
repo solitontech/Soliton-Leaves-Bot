@@ -22,6 +22,8 @@ export interface EmailData {
     from: {
         emailAddress: EmailAddress;
     };
+    toRecipients?: Array<{ emailAddress: EmailAddress }>;
+    ccRecipients?: Array<{ emailAddress: EmailAddress }>;
     body: EmailBody;
     bodyPreview: string;
     receivedDateTime: string;
@@ -32,6 +34,12 @@ export interface EmailData {
 export interface InternetMessageHeader {
     name: string;
     value: string;
+}
+
+// Full resolution result: the identified EmailData and its sender
+export interface ThreadResolutionResult {
+    leaveEmail: EmailData;
+    senderEmail: string;
 }
 
 export interface EmailContent {

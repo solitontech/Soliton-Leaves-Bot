@@ -1,9 +1,9 @@
 import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import getGraphToken from "../graph-authentication/graphAuth.js";
-import axios from "axios";
 import { processLeaveApplication } from "./services/leaveApplicationService.js";
 import { parseLeaveRequest, MissingFieldsError } from "./services/email-parser-service/emailParser.js";
+import { resolveLeaveEmailFromThread } from "./services/email-parser-service/emailThreadService.js";
 import { getEmployeeByEmail } from "./services/greytHr-service/greytHrClient.js";
 import {
     sendSuccessNotification,
@@ -18,8 +18,8 @@ import https from 'https';
 import http from 'http';
 import fs from 'fs';
 import type {
+    EmailData,
     GraphNotificationPayload,
-    EmailData
 } from "./types/index.js";
 
 const app = express();
@@ -58,97 +58,79 @@ app.post("/email-notification", async (req: Request, res: Response) => {
     if (!notif) return;
 
     const messageId = notif.resourceData?.id;
+    if (!messageId) return;
 
-    if (messageId) {
-        try {
-            const token = await getGraphToken();
+    try {
+        const token = await getGraphToken();
 
-            // Fetch the email that triggered the notification
-            LOG.info(`📧 Fetching email: ${messageId}`);
-            const emailResponse = await axios.get<EmailData>(
-                `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+        // ── Step 1: Resolve the leave-request email from the conversation thread ──
+        LOG.info(`🧵 Resolving leave request email from conversation thread...`);
+        const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
 
-            const email = emailResponse.data;
-            const senderEmail = email.from?.emailAddress?.address;
+        if (!senderEmail) {
+            LOG.error(`❌ No sender email found in resolved leave email`);
+            return;
+        }
 
-            if (!senderEmail) {
-                LOG.error(`❌ No sender email found in message`);
-                return;
-            }
+        // Prevent infinite loops: ignore emails sent by the bot itself
+        if (senderEmail.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
+            LOG.info(`⏩ Ignoring email from self (${senderEmail}) to prevent infinite loop.`);
+            return;
+        }
 
-            // prevent infinite loops: Ignore emails sent by the bot itself
-            if (senderEmail.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
-                LOG.info(`⏩ Ignoring email from self (${senderEmail}) to prevent infinite loop.`);
-                return;
-            }
+        LOG.info(`📧 Processing leave request from: ${senderEmail}`);
 
-            LOG.info(`📧 Processing leave request from: ${senderEmail}`);
+        // ── Step 2: Parse the leave request from the resolved email ──────────────
+        LOG.info(`🤖 Parsing leave request with AI...`);
+        const leaveRequest = await parseLeaveRequest(leaveEmail);
 
-            // Step 1: Parse and validate the leave request from the email
-            LOG.info(`🤖 Parsing leave request with AI...`);
-            const leaveRequest = await parseLeaveRequest(email);
+        // ── Step 3: Get employee details from GreytHR ────────────────────────────
+        LOG.info(`👤 Fetching employee details from GreytHR...`);
+        const employee = await getEmployeeByEmail(senderEmail);
 
-            // Step 2: Get employee details from GreytHR
-            LOG.info(`👤 Fetching employee details from GreytHR...`);
-            const employee = await getEmployeeByEmail(senderEmail);
+        // ── Step 4: Submit leave application to GreytHR ──────────────────────────
+        LOG.info(`🚀 Submitting leave application to GreytHR...`);
+        const result = await processLeaveApplication(leaveRequest, employee);
 
-            // Step 3: Submit leave application to GreytHR
-            LOG.info(`🚀 Submitting leave application to GreytHR...`);
-            const result = await processLeaveApplication(leaveRequest, employee);
+        // ── Step 5: Send notification email ──────────────────────────────────────
+        if (result.success) {
+            LOG.info(`✅ Leave application submitted successfully!`);
+            await sendSuccessNotification(leaveEmail, senderEmail, employee, leaveRequest, token);
+        } else {
+            LOG.error(`❌ Leave application failed!`);
+            await sendFailureNotification(leaveEmail, senderEmail, employee, result, token);
+        }
 
-            // Step 4: Send notification email
-            if (result.success) {
-                LOG.info(`✅ Leave application submitted successfully!`);
-                await sendSuccessNotification(email, senderEmail, employee, leaveRequest, token);
-            } else {
-                LOG.error(`❌ Leave application failed!`);
-                await sendFailureNotification(email, senderEmail, employee, result, token);
-            }
-        } catch (error) {
-            const err = error as Error;
+    } catch (error) {
+        const err = error as Error;
 
-            // Handle missing fields error specifically
-            if (err instanceof MissingFieldsError) {
-                LOG.error(`❌ Missing required fields: ${err.missingFields.join(', ')}`);
-                try {
-                    const token = await getGraphToken();
-                    const emailResponse = await axios.get<EmailData>(
-                        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
-                    const email = emailResponse.data;
-                    const senderEmail = email.from?.emailAddress?.address;
-                    if (senderEmail) {
-                        await sendMissingFieldsNotification(email, senderEmail, err.missingFields, token);
-                    }
-                } catch (notificationError) {
-                    LOG.error(`⚠️  Failed to send missing fields notification`);
-                }
-                return;
-            }
-
-            // Handle other errors
-            LOG.error(`❌ Error processing email notification: ${err.message}`);
-
-            // Try to send error notification if we have enough context
+        // Handle missing fields error specifically
+        if (err instanceof MissingFieldsError) {
+            LOG.error(`❌ Missing required fields: ${err.missingFields.join(', ')}`);
             try {
                 const token = await getGraphToken();
-                const emailResponse = await axios.get<EmailData>(
-                    `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${messageId}`,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-
-                const email = emailResponse.data;
-                const senderEmail = email.from?.emailAddress?.address;
-
+                const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
                 if (senderEmail) {
-                    await sendErrorNotification(email, senderEmail, err.message, token);
+                    await sendMissingFieldsNotification(leaveEmail, senderEmail, err.missingFields, token);
                 }
             } catch (notificationError) {
-                LOG.error(`⚠️  Failed to send error notification`);
+                LOG.error(`⚠️  Failed to send missing fields notification`);
             }
+            return;
+        }
+
+        // Handle other errors
+        LOG.error(`❌ Error processing email notification: ${err.message}`);
+
+        // Try to send error notification if we have enough context
+        try {
+            const token = await getGraphToken();
+            const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
+            if (senderEmail) {
+                await sendErrorNotification(leaveEmail, senderEmail, err.message, token);
+            }
+        } catch (notificationError) {
+            LOG.error(`⚠️  Failed to send error notification`);
         }
     }
 });
