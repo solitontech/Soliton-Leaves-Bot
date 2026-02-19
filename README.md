@@ -67,6 +67,58 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
    npm run dev
    ```
 
+## 🌐 Persistent Deployment (Ubuntu/Linux)
+
+To run the application and ngrok persistently (so they don't stop when you close your terminal), follow these steps:
+
+### Running the App
+**Option 1: Using tmux (Recommended)**
+1. Use **`tmux`** to create a persistent session:
+   ```bash
+   tmux new -s bot
+   ```
+2. Inside the session, start the app:
+   ```bash
+   npm start
+   ```
+3. To detach (leave it running in background), press `Ctrl+B`, then `D`.
+4. To check on it later, running: `tmux attach -t bot`
+
+**Option 2: Using nohup (Simpler)**
+To run the app in the background:
+```bash
+nohup npm start &
+```
+- To stop it, find the process ID: `pgrep -fl "node dist/server/server.js"`
+- Kill the process: `kill <PID>`
+
+### Running Ngrok (For Testing/Development)
+**Note:** Ngrok is primarily for testing and development. The free version changes the URL every time it restarts, so you will need to update your `PUBLIC_URL` in `.env` and re-run `npm run subscribe` if the ngrok process stops.
+
+**Option 1: Using tmux (Recommended)**
+1. Start a new tmux session (or split your existing one):
+   ```bash
+   tmux new -s ngrok
+   ```
+2. Start ngrok on your app's port (default 3978):
+   ```bash
+   ngrok http <port number>
+   ```
+3. Detach with `Ctrl+B`, then `D`.
+
+**Option 2: Using nohup (Simpler)**
+If you don't want to use tmux, you can run ngrok in the background:
+```bash
+nohup ngrok http <port number> > /dev/null 2>&1 &
+```
+- To find the public URL, run: `curl http://localhost:4040/api/tunnels`
+- To stop it, find the process ID with `pgrep ngrok` and run `kill <PID>`.
+
+### Stopping the Persistent Processes
+1. Attach to the session: `tmux attach -t bot` (or `ngrok`)
+2. Press `Ctrl+C` to stop the process.
+3. Type `exit` to close the session.
+
 ## 📦 Dependencies
 
 ### Production Dependencies
