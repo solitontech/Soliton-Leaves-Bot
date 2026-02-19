@@ -88,6 +88,7 @@ export async function sendFailureNotification(
                     <p><strong>❌ Failed to submit your leave application.</strong></p>
                     <p><strong>Error:</strong> ${!result.success ? result.error : 'Unknown error'}</p>
                     <p>Please check if you have any leaves of this type left, or whether you have already taken a leave on these dates. Also please note that sick leaves cannot be taken for the future.</p>
+                    <p><strong><u>Once you have corrected the error, please send a new email.</u></strong></p>
                     <p>If all else fails please contact HR or IT support for assistance, or manually submit your leave request.</p>
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
@@ -182,6 +183,7 @@ export async function sendErrorNotification(
                     <p><strong>❌ An error occurred while processing your leave request.</strong></p>
                     <p><strong>Error:</strong> ${errorMessage}</p>
                     <p>Please check if you have any leaves of this type left, or whether you have already taken a leave on these dates. Also please note that sick leaves cannot be taken for the future.</p>
+                    <p><strong><u>Once you have corrected the error, please send a new email.</u></strong></p>
                     <p>If all else fails please contact HR or IT support for assistance, or manually submit your leave request.</p>
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
