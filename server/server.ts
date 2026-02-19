@@ -133,8 +133,6 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
         // Handle other errors
         LOG.error(`❌ Error processing email notification: ${err.message}`);
-
-        // Try to send error notification if we have enough context
         try {
             const token = await getGraphToken();
             const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
