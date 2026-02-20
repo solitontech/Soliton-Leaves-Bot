@@ -253,6 +253,9 @@ export interface EnvironmentConfig {
     // Monitored Email
     MONITORED_EMAIL: string;
 
+    // Default leave type when none is specified in the email
+    DEFAULT_LEAVE_TYPE: string;
+
     // SSL Certificate Configuration
     SSL_KEY_PATH?: string;
     SSL_CERT_PATH?: string;

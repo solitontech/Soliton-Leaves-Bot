@@ -32,6 +32,9 @@ const env: EnvironmentConfig = {
     // Monitored Email
     MONITORED_EMAIL: process.env['MONITORED_EMAIL']!,
 
+    // Default leave type (used when the email does not specify one)
+    DEFAULT_LEAVE_TYPE: process.env['DEFAULT_LEAVE_TYPE'] || 'Sick Leave',
+
     // SSL Certificate Configuration (optional, for HTTPS)
     SSL_KEY_PATH: process.env['SSL_KEY_PATH'],
     SSL_CERT_PATH: process.env['SSL_CERT_PATH'],

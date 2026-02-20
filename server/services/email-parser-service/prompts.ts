@@ -4,6 +4,7 @@
  */
 
 import type { EmailContent } from '../../types/index.js';
+import env from '../../env.js';
 
 /**
  * Generate a prompt for extracting leave request information from email content
@@ -45,7 +46,7 @@ Please respond ONLY with a valid JSON array. Even if there is only one leave req
 Important:
 - transaction should be "availed" for applying for leave, or "cancelled" for cancelling a leave
 - If not specified, default transaction to "availed". If people are requesting a leave, interpret that as "availed". If people are cancelling a request or cancelling a leave, interpret that as "cancelled"
-- If leave type is not specified, or mentioned as "personal leave" or "personal work", then default to "Sick Leave"
+- If leave type is not specified, or mentioned as "personal leave" or "personal work", then default to "${env.DEFAULT_LEAVE_TYPE}"
 - fromSession and toSession are optional integer fields (1 or 2). 1 is first half of the day, 2 is second half of the day
   - If fromSession or toSession are not mentioned in the email, set them to null
   - If people mention they are requesting leave for "first half" or "forenoon" or "morning session" or "till lunch" that means they are requesting fromSession 1 and toSession 1
