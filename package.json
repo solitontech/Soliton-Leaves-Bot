@@ -33,7 +33,8 @@
         "dotenv": "^16.4.1",
         "express": "^4.18.2",
         "openai": "^4.28.0",
-        "qs": "^6.11.2"
+        "qs": "^6.11.2",
+        "winston": "^3.19.0"
     },
     "devDependencies": {
         "@types/body-parser": "^1.19.6",

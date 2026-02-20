@@ -12,13 +12,12 @@ import {
     sendMissingFieldsNotification
 } from "./services/notificationService.js";
 import env from "./env.js";
-import LOG from "./services/loggerService.js";
+import LOG, { createLeaveLogger } from "./services/loggerService.js";
 import { CloudAdapter, ConfigurationServiceClientCredentialFactory, TurnContext } from "botbuilder";
 import https from 'https';
 import http from 'http';
 import fs from 'fs';
 import type {
-    EmailData,
     GraphNotificationPayload,
 } from "./types/index.js";
 
@@ -80,37 +79,52 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
         LOG.info(`📧 Processing leave request from: ${senderEmail}`);
 
-        // ── Step 2: Parse the leave request(s) from the resolved email ───────────
-        LOG.info(`🤖 Parsing leave request(s) with AI...`);
-        const leaveRequests = await parseLeaveRequest(leaveEmail);
+        // ── Create a per-request file logger ─────────────────────────────────────
+        // File: logs/{year}/{YYYY-MM-DD_senderEmail}.log
+        const leaveLogger = createLeaveLogger(leaveEmail.receivedDateTime, senderEmail);
+        leaveLogger.info(`===== Leave Request Processing Started =====`);
+        leaveLogger.info(`Sender   : ${senderEmail}`);
+        leaveLogger.info(`Subject  : ${leaveEmail.subject}`);
+        leaveLogger.info(`MessageId: ${messageId}`);
 
-        LOG.info(`🗓️  Found ${leaveRequests.length} leave request(s) to process`);
+        try {
+            // ── Step 2: Parse the leave request(s) from the resolved email ───────────
+            leaveLogger.info(`🤖 Parsing leave request(s) with AI...`);
+            const leaveRequests = await parseLeaveRequest(leaveEmail);
 
-        // ── Step 3: Get employee details from GreytHR (once for all requests) ────
-        LOG.info(`👤 Fetching employee details from GreytHR...`);
-        const employee = await getEmployeeByEmail(senderEmail);
+            leaveLogger.info(`🗓️  Found ${leaveRequests.length} leave request(s) to process`);
 
-        // ── Steps 4 & 5: Process each leave request independently ────────────────
-        for (let i = 0; i < leaveRequests.length; i++) {
-            const leaveRequest = leaveRequests[i]!;
-            const label = leaveRequests.length > 1 ? ` [${i + 1}/${leaveRequests.length}]` : "";
+            // ── Step 3: Get employee details from GreytHR (once for all requests) ────
+            leaveLogger.info(`👤 Fetching employee details from GreytHR...`);
+            const employee = await getEmployeeByEmail(senderEmail);
 
-            try {
-                LOG.info(`🚀 Submitting leave application${label} to GreytHR...`);
-                const result = await processLeaveApplication(leaveRequest, employee);
+            // ── Steps 4 & 5: Process each leave request independently ────────────────
+            for (let i = 0; i < leaveRequests.length; i++) {
+                const leaveRequest = leaveRequests[i]!;
+                const label = leaveRequests.length > 1 ? ` [${i + 1}/${leaveRequests.length}]` : "";
 
-                if (result.success) {
-                    LOG.info(`✅ Leave application${label} submitted successfully!`);
-                    await sendSuccessNotification(leaveEmail, senderEmail, employee, leaveRequest, token);
-                } else {
-                    LOG.error(`❌ Leave application${label} failed!`);
-                    await sendFailureNotification(leaveEmail, senderEmail, employee, result, token);
+                try {
+                    leaveLogger.info(`🚀 Submitting leave application${label} to GreytHR...`);
+                    leaveLogger.info(`   Type: ${leaveRequest.leaveType} | Tx: ${leaveRequest.transaction} | ${leaveRequest.fromDate} → ${leaveRequest.toDate}`);
+                    const result = await processLeaveApplication(leaveRequest, employee);
+
+                    if (result.success) {
+                        leaveLogger.info(`✅ Leave application${label} submitted successfully!`);
+                        await sendSuccessNotification(leaveEmail, senderEmail, employee, leaveRequest, token);
+                    } else {
+                        leaveLogger.error(`❌ Leave application${label} failed!`);
+                        await sendFailureNotification(leaveEmail, senderEmail, employee, result, token);
+                    }
+                } catch (leaveError) {
+                    const le = leaveError as Error;
+                    leaveLogger.error(`❌ Error processing leave application${label}: ${le.message}`);
+                    await sendErrorNotification(leaveEmail, senderEmail, le.message, token);
                 }
-            } catch (leaveError) {
-                const le = leaveError as Error;
-                LOG.error(`❌ Error processing leave application${label}: ${le.message}`);
-                await sendErrorNotification(leaveEmail, senderEmail, le.message, token);
             }
+
+            leaveLogger.info(`===== Leave Request Processing Complete =====`);
+        } finally {
+            await leaveLogger.destroy();
         }
 
     } catch (error) {

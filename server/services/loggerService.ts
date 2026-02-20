@@ -1,338 +1,247 @@
 /**
  * Logger Service
- * Centralized logging service for the application
- * Currently uses console.log but can be extended to support file logging, external services, etc.
+ * Centralised logging using Winston.
+ *
+ * Two layers:
+ *  1. `LOG` (default export) – application-level logger that writes only to
+ *     the console.  Used for startup, subscription, webhook validation, etc.
+ *
+ *  2. `createLeaveLogger(receivedDateTime, senderEmail)` – creates a per-request
+ *     logger that writes to BOTH the console AND a dedicated log file at:
+ *       logs/{year}/{YYYY-MM-DD_senderEmail}.log
+ *
+ *     The caller is responsible for calling `.destroy()` on the returned logger
+ *     when the request is fully processed so the file transport is flushed.
  */
 
-import type { LeaveRequest } from '../types/index.js';
+import winston from "winston";
+import path from "path";
+import { fileURLToPath } from "url";
+import type { LeaveRequest } from "../types/index.js";
 
+// ─── Root path resolution ─────────────────────────────────────────────────────
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Project root is 3 levels up from server/services/
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..");
+const LOGS_DIR = path.join(PROJECT_ROOT, "logs");
+
+// ─── Shared formats ───────────────────────────────────────────────────────────
+const timestampedConsoleFormat = winston.format.combine(
+    winston.format.colorize(),
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.printf(({ timestamp, level, message }) => `[${timestamp}] ${level}: ${message}`)
+);
+
+const timestampedFileFormat = winston.format.combine(
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.printf(({ timestamp, level, message }) => `[${timestamp}] [${level.toUpperCase()}] ${message}`)
+);
+
+// ─── 1. Application-level console logger ────────────────────────────────────
 class LoggerService {
-    /**
-     * Log informational messages
-     */
+    private logger: winston.Logger;
+
+    constructor() {
+        this.logger = winston.createLogger({
+            level: "info",
+            transports: [
+                new winston.transports.Console({ format: timestampedConsoleFormat })
+            ]
+        });
+    }
+
     info(message: string, data: any = null): void {
-        if (data !== null) {
-            console.log(message, data);
-        } else {
-            console.log(message);
-        }
+        this.logger.info(data != null ? `${message} ${JSON.stringify(data)}` : message);
     }
 
-    /**
-     * Log error messages
-     */
     error(message: string, error: any = null): void {
-        if (error !== null) {
-            console.error(message, error);
-        } else {
-            console.error(message);
-        }
+        this.logger.error(error != null ? `${message} ${JSON.stringify(error)}` : message);
     }
 
-    /**
-     * Log warning messages
-     */
     warn(message: string, data: any = null): void {
-        if (data !== null) {
-            console.warn(message, data);
-        } else {
-            console.warn(message);
-        }
+        this.logger.warn(data != null ? `${message} ${JSON.stringify(data)}` : message);
     }
 
-    /**
-     * Log debug messages
-     */
     debug(message: string, data: any = null): void {
-        if (data !== null) {
-            console.log(message, data);
-        } else {
-            console.log(message);
-        }
+        this.logger.debug(data != null ? `${message} ${JSON.stringify(data)}` : message);
     }
 
-    /**
-     * Log a separator line
-     */
-    separator(length: number = 60): void {
-        console.log("=".repeat(length));
-    }
-
-    /**
-     * Log a section header
-     */
+    separator(length: number = 60): void { this.logger.info("=".repeat(length)); }
     section(title: string, length: number = 60): void {
-        console.log("\n" + "=".repeat(length));
-        console.log(title);
-        console.log("=".repeat(length));
+        this.logger.info("\n" + "=".repeat(length));
+        this.logger.info(title);
+        this.logger.info("=".repeat(length));
     }
 
-    /**
-     * Log Graph notification received
-     */
-    graphNotificationReceived(): void {
-        console.log("📨 Received Graph notification");
-    }
-
-    /**
-     * Log validation request
-     */
+    graphNotificationReceived(): void { this.logger.info("📨 Received Graph notification"); }
     graphValidationRequest(token: string): void {
-        console.log("✅ Validation request received");
-        console.log("Validation token:", token);
+        this.logger.info("✅ Validation request received");
+        this.logger.info(`Validation token: ${token}`);
     }
-
-    /**
-     * Log Graph notification body
-     */
-    graphNotificationBody(body: any): void {
-        console.log("Graph notification body:", body);
-    }
-
-    /**
-     * Log full email data
-     */
-    fullEmail(emailData: any): void {
-        console.log("Full email:", emailData);
-    }
-
-    /**
-     * Log parsing leave request
-     */
-    parsingLeaveRequest(): void {
-        console.log("\n🔍 Parsing leave request from email...");
-    }
-
-    /**
-     * Log valid leave request parsed
-     */
+    graphNotificationBody(body: any): void { this.logger.info(`Graph notification body: ${JSON.stringify(body)}`); }
+    fullEmail(emailData: any): void { this.logger.info(`Full email: ${JSON.stringify(emailData)}`); }
+    parsingLeaveRequest(): void { this.logger.info("\n🔍 Parsing leave request from email..."); }
     validLeaveRequestParsed(leaveRequest: LeaveRequest): void {
-        console.log("✅ Valid leave request parsed:");
-        console.log(`   From: ${leaveRequest.fromEmail}`);
-        console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-        console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   Start Date: ${leaveRequest.fromDate}`);
-        console.log(`   To Date: ${leaveRequest.toDate}`);
-        console.log(`   Reason: ${leaveRequest.reason || "N/A"}`);
-        console.log(`   Confidence: ${leaveRequest.confidence}`);
+        this.logger.info(`✅ Valid leave request parsed:`);
+        this.logger.info(`   From: ${leaveRequest.fromEmail}`);
+        this.logger.info(`   Leave Type: ${leaveRequest.leaveType}`);
+        this.logger.info(`   Transaction: ${leaveRequest.transaction}`);
+        this.logger.info(`   Start Date: ${leaveRequest.fromDate}`);
+        this.logger.info(`   To Date: ${leaveRequest.toDate}`);
+        this.logger.info(`   Reason: ${leaveRequest.reason || "N/A"}`);
+        this.logger.info(`   Confidence: ${leaveRequest.confidence}`);
     }
-
-    /**
-     * Log submitting to GreytHR
-     */
-    submittingToGreytHR(): void {
-        console.log("\n🚀 Submitting to GreytHR...");
-    }
-
-    /**
-     * Log leave application success
-     */
+    submittingToGreytHR(): void { this.logger.info("\n🚀 Submitting to GreytHR..."); }
     leaveApplicationSuccess(applicationId?: string): void {
-        console.log("✅ Leave application submitted successfully!");
-        if (applicationId) {
-            console.log(`   Application ID: ${applicationId}`);
-        }
+        this.logger.info("✅ Leave application submitted successfully!");
+        if (applicationId) this.logger.info(`   Application ID: ${applicationId}`);
     }
-
-    /**
-     * Log leave application failure
-     */
     leaveApplicationFailed(error: string): void {
-        console.error("❌ Leave application failed:");
-        console.error(`   Error: ${error}`);
+        this.logger.error("❌ Leave application failed:");
+        this.logger.error(`   Error: ${error}`);
     }
-
-    /**
-     * Log incomplete leave request
-     */
     incompleteLeaveRequest(missingFields: string[], confidence: string): void {
-        console.log("⚠️ Incomplete leave request detected");
-        console.log(`   Missing fields: ${missingFields.join(", ")}`);
-        console.log(`   Confidence: ${confidence}`);
+        this.logger.warn("⚠️ Incomplete leave request detected");
+        this.logger.warn(`   Missing fields: ${missingFields.join(", ")}`);
+        this.logger.warn(`   Confidence: ${confidence}`);
     }
-
-    /**
-     * Log parsing email from address
-     */
-    parsingEmailFrom(email: string): void {
-        console.log("Parsing email from:", email);
-    }
-
-    /**
-     * Log OpenAI response
-     */
-    openAIResponse(response: string): void {
-        console.log("OpenAI Response:", response);
-    }
-
-    /**
-     * Log parsed leave request
-     */
-    parsedLeaveRequest(result: LeaveRequest): void {
-        console.log("Parsed leave request:", result);
-    }
-
-    /**
-     * Log GreytHR authentication
-     */
-    greytHRAuthenticating(): void {
-        console.log("🔐 Authenticating with GreytHR...");
-    }
-
-    /**
-     * Log GreytHR authentication success
-     */
-    greytHRAuthSuccess(): void {
-        console.log("✅ GreytHR authentication successful");
-    }
-
-    /**
-     * Log GreytHR request details
-     */
+    parsingEmailFrom(email: string): void { this.logger.info(`Parsing email from: ${email}`); }
+    openAIResponse(response: string): void { this.logger.info(`OpenAI Response: ${response}`); }
+    parsedLeaveRequest(result: LeaveRequest): void { this.logger.info(`Parsed leave request: ${JSON.stringify(result)}`); }
+    greytHRAuthenticating(): void { this.logger.info("🔐 Authenticating with GreytHR..."); }
+    greytHRAuthSuccess(): void { this.logger.info("✅ GreytHR authentication successful"); }
     greytHRRequestDetails(url: string, domain: string): void {
-        console.log(`URL: ${url}`);
-        console.log(`Domain: ${domain}`);
+        this.logger.info(`URL: ${url}`);
+        this.logger.info(`Domain: ${domain}`);
     }
-
-    /**
-     * Log fetching employee details
-     */
-    fetchingEmployeeDetails(email: string): void {
-        console.log(`🔍 Fetching employee details for: ${email}`);
-    }
-
-    /**
-     * Log employee found
-     */
-    employeeFound(name: string): void {
-        console.log(`✅ Found employee: ${name}`);
-    }
-
-    /**
-     * Log submitting leave application
-     */
+    fetchingEmployeeDetails(email: string): void { this.logger.info(`🔍 Fetching employee details for: ${email}`); }
+    employeeFound(name: string): void { this.logger.info(`✅ Found employee: ${name}`); }
     submittingLeaveApplication(leaveApplication: any): void {
-        console.log("📝 Submitting leave application to GreytHR...");
-        console.log("   Leave Application:", leaveApplication);
+        this.logger.info("📝 Submitting leave application to GreytHR...");
+        this.logger.info(`   Leave Application: ${JSON.stringify(leaveApplication)}`);
     }
-
-    /**
-     * Log leave application submitted
-     */
-    leaveApplicationSubmitted(): void {
-        console.log("✅ Leave application submitted successfully");
-    }
-
-    /**
-     * Log processing leave application header
-     */
+    leaveApplicationSubmitted(): void { this.logger.info("✅ Leave application submitted successfully"); }
     processingLeaveApplicationHeader(): void {
-        console.log("\n" + "=".repeat(60));
-        console.log("🚀 Processing Leave Application");
-        console.log("=".repeat(60));
+        this.logger.info("\n" + "=".repeat(60));
+        this.logger.info("🚀 Processing Leave Application");
+        this.logger.info("=".repeat(60));
     }
-
-    /**
-     * Log employee details step
-     */
     stepFetchingEmployee(email: string): void {
-        console.log("\n👤 Step 1: Fetching employee details...");
-        console.log(`   Email: ${email}`);
+        this.logger.info("\n👤 Step 1: Fetching employee details...");
+        this.logger.info(`   Email: ${email}`);
     }
-
-    /**
-     * Log employee details
-     */
     employeeDetails(employeeNo: string, employeeName: string, solitonEmployeeId: string): void {
-        console.log(`   Employee No: ${employeeNo}`);
-        console.log(`   Employee Name: ${employeeName}`);
-        console.log(`   Soliton Employee ID: ${solitonEmployeeId}`);
+        this.logger.info(`   Employee No: ${employeeNo}`);
+        this.logger.info(`   Employee Name: ${employeeName}`);
+        this.logger.info(`   Soliton Employee ID: ${solitonEmployeeId}`);
     }
-
-    /**
-     * Log preparing leave application step
-     */
     stepPreparingLeaveApplication(leaveRequest: LeaveRequest): void {
-        console.log("\n📝 Step 2: Preparing leave application...");
-        console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-        console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   From: ${leaveRequest.fromDate}`);
-        console.log(`   To: ${leaveRequest.toDate}`);
-        console.log(`   Reason: ${leaveRequest.reason || "Leave request via email"}`);
+        this.logger.info("\n📝 Step 2: Preparing leave application...");
+        this.logger.info(`   Leave Type: ${leaveRequest.leaveType}`);
+        this.logger.info(`   Transaction: ${leaveRequest.transaction}`);
+        this.logger.info(`   From: ${leaveRequest.fromDate}`);
+        this.logger.info(`   To: ${leaveRequest.toDate}`);
+        this.logger.info(`   Reason: ${leaveRequest.reason || "Leave request via email"}`);
     }
-
-    /**
-     * Log submitting to GreytHR step
-     */
-    stepSubmittingToGreytHR(): void {
-        console.log("\n🚀 Step 3: Submitting to GreytHR...");
-    }
-
-    /**
-     * Log leave application success summary
-     */
+    stepSubmittingToGreytHR(): void { this.logger.info("\n🚀 Step 3: Submitting to GreytHR..."); }
     leaveApplicationSuccessSummary(employeeName: string, employeeNo: string, leaveRequest: LeaveRequest): void {
-        console.log("\n" + "=".repeat(60));
-        console.log("✅ Leave Application Successful!");
-        console.log("=".repeat(60));
-        console.log(`   Employee: ${employeeName} (${employeeNo})`);
-        console.log(`   Leave Type: ${leaveRequest.leaveType}`);
-        console.log(`   Transaction: ${leaveRequest.transaction}`);
-        console.log(`   Duration: ${leaveRequest.fromDate} to ${leaveRequest.toDate}`);
-        console.log("=".repeat(60) + "\n");
+        this.logger.info("\n" + "=".repeat(60));
+        this.logger.info("✅ Leave Application Successful!");
+        this.logger.info("=".repeat(60));
+        this.logger.info(`   Employee: ${employeeName} (${employeeNo})`);
+        this.logger.info(`   Leave Type: ${leaveRequest.leaveType}`);
+        this.logger.info(`   Transaction: ${leaveRequest.transaction}`);
+        this.logger.info(`   Duration: ${leaveRequest.fromDate} to ${leaveRequest.toDate}`);
+        this.logger.info("=".repeat(60) + "\n");
     }
-
-    /**
-     * Log leave application failure summary
-     */
     leaveApplicationFailureSummary(errorMessage: string): void {
-        console.error("\n" + "=".repeat(60));
-        console.error("❌ Leave Application Failed!");
-        console.error("=".repeat(60));
-        console.error(`   Error: ${errorMessage}`);
-        console.error("=".repeat(60) + "\n");
+        this.logger.error("\n" + "=".repeat(60));
+        this.logger.error("❌ Leave Application Failed!");
+        this.logger.error("=".repeat(60));
+        this.logger.error(`   Error: ${errorMessage}`);
+        this.logger.error("=".repeat(60) + "\n");
     }
-
-    /**
-     * Log GreytHR API request failed
-     */
     greytHRAPIRequestFailed(method: string, endpoint: string, status: number | null = null, responseData: any = null): void {
-        console.error(`❌ GreytHR API request failed: ${method} ${endpoint}`);
-        if (status) {
-            console.error("Status:", status);
-        }
-        if (responseData) {
-            console.error("Response:", responseData);
-        }
+        this.logger.error(`❌ GreytHR API request failed: ${method} ${endpoint}`);
+        if (status) this.logger.error(`Status: ${status}`);
+        if (responseData) this.logger.error(`Response: ${JSON.stringify(responseData)}`);
     }
-
-    /**
-     * Log server startup
-     */
     serverStartup(port: number, publicUrl: string, isHttps: boolean, certPath: string | null = null): void {
         if (isHttps) {
-            console.log(`✅ HTTPS Server listening on port ${port}`);
-            if (certPath) {
-                console.log(`🔒 SSL Certificate: ${certPath}`);
-            }
+            this.logger.info(`✅ HTTPS Server listening on port ${port}`);
+            if (certPath) this.logger.info(`🔒 SSL Certificate: ${certPath}`);
         } else {
-            console.log(`⚠️  HTTP Server listening on port ${port}`);
+            this.logger.warn(`⚠️  HTTP Server listening on port ${port}`);
         }
-        console.log(`🌐 Public URL: ${publicUrl}`);
+        this.logger.info(`🌐 Public URL: ${publicUrl}`);
     }
-
-    /**
-     * Log server startup failure
-     */
     serverStartupFailed(errorMessage: string, keyPath: string, certPath: string): void {
-        console.error("❌ Failed to start HTTPS server:");
-        console.error("   Error:", errorMessage);
-        console.error("\n💡 Check that SSL certificate files exist and are readable:");
-        console.error(`   Key: ${keyPath}`);
-        console.error(`   Cert: ${certPath}`);
+        this.logger.error("❌ Failed to start HTTPS server:");
+        this.logger.error(`   Error: ${errorMessage}`);
+        this.logger.error("\n💡 Check that SSL certificate files exist and are readable:");
+        this.logger.error(`   Key: ${keyPath}`);
+        this.logger.error(`   Cert: ${certPath}`);
     }
 }
 
-// Export a singleton instance
+// ─── 2. Per-request leave logger factory ────────────────────────────────────
+
+/**
+ * A per-request logger that writes to both the console and a dedicated log file.
+ * Call `.destroy()` when the request is complete to flush the file transport.
+ */
+export interface LeaveLogger {
+    info(message: string): void;
+    warn(message: string): void;
+    error(message: string): void;
+    destroy(): Promise<void>;
+}
+
+/**
+ * Build the log file path:
+ *   logs/{year}/{YYYY-MM-DD_senderEmail}.log
+ *
+ * @param receivedDateTime - ISO string of when the email was received
+ * @param senderEmail      - email address of the leave requester
+ */
+export function createLeaveLogger(receivedDateTime: string, senderEmail: string): LeaveLogger {
+    const date = new Date(receivedDateTime);
+    const year = date.getUTCFullYear();
+    const yyyy = year.toString();
+    const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(date.getUTCDate()).padStart(2, "0");
+
+    // Sanitise the email so it's a safe filename segment
+    const safeEmail = senderEmail.replace(/[^a-zA-Z0-9@._-]/g, "_");
+    const fileName = `${yyyy}-${mm}-${dd}_${safeEmail}.log`;
+    const filePath = path.join(LOGS_DIR, yyyy, fileName);
+
+    const winstonLogger = winston.createLogger({
+        level: "info",
+        transports: [
+            new winston.transports.Console({ format: timestampedConsoleFormat }),
+            new winston.transports.File({
+                filename: filePath,
+                format: timestampedFileFormat
+            })
+        ]
+    });
+
+    return {
+        info(message: string) { winstonLogger.info(message); },
+        warn(message: string) { winstonLogger.warn(message); },
+        error(message: string) { winstonLogger.error(message); },
+        destroy(): Promise<void> {
+            return new Promise((resolve) => {
+                winstonLogger.on("finish", resolve);
+                winstonLogger.end();
+            });
+        }
+    };
+}
+
+// ─── Singleton application logger ────────────────────────────────────────────
 const LOG = new LoggerService();
 export default LOG;
