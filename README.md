@@ -35,17 +35,13 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
    ```
 
 3. **Configure environment variables**
+
+   The project supports separate environment files for development and production:
+
    ```bash
-   cp .env.example .env
+   cp .env.example .env.dev   # Local development
+   cp .env.example .env.prod  # Production server
    ```
-   
-   Edit `.env` and fill in your credentials:
-   - `BOT_APP_ID`: Your Microsoft Bot Application ID
-   - `BOT_APP_SECRET`: Your Microsoft Bot Application Secret
-   - `TENANT_ID`: Your Azure AD Tenant ID
-   - `OPENAI_API_KEY`: Your OpenAI API key
-   - `PUBLIC_URL`: Your public-facing URL (for webhooks)
-   - `GREYTHR_*`: GreytHR configuration details
 
 4. **Build the project**
    ```bash
@@ -66,6 +62,24 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
    ```bash
    npm run dev
    ```
+
+## 🔐 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `BOT_APP_ID` | Microsoft Bot Application ID | ✅ |
+| `BOT_APP_SECRET` | Microsoft Bot Application Secret | ✅ |
+| `TENANT_ID` | Azure AD Tenant ID | ✅ |
+| `OPENAI_API_KEY` | OpenAI API Key | ✅ |
+| `MONITORED_EMAIL` | The mailbox address to monitor for leave request emails | ✅ |
+| `PUBLIC_URL` | Public URL for webhooks | ✅ |
+| `PORT` | Local server port (default: 3978) | ❌ |
+| `DEFAULT_LEAVE_TYPE` | Fallback leave type when email doesn't specify one (default: `Sick Leave`) | ❌ |
+| `GREYTHR_API_URL` | GreytHR API Base URL | ✅ |
+| `GREYTHR_AUTH_URL` | GreytHR Authentication URL | ✅ |
+| `GREYTHR_DOMAIN` | GreytHR Domain ID | ✅ |
+| `GREYTHR_USERNAME` | GreytHR API User | ✅ |
+| `GREYTHR_PASSWORD` | GreytHR API Password | ✅ |
 
 ## 🌐 Persistent Deployment (Ubuntu/Linux)
 
@@ -160,25 +174,28 @@ Soliton-Leaves-Bot/
 
 ## 🔧 Available Scripts
 
-- `npm start` - Start the production server
-- `npm run dev` - Start development server with auto-reload
-- `npm run subscribe` - Subscribe to mailbox notifications
+| Script | Env File | Description |
+|--------|----------|-------------|
+| `npm start` | `.env` | Start server (plain fallback, no env prefix) |
+| `npm run dev` | `.env.dev` | Build + start with nodemon (auto-reload) |
+| `npm run prod` | `.env.prod` | Build + start for production |
+| `npm run subscribe` | `.env.dev` | Subscribe mailbox to Graph API notifications (dev) |
+| `npm run subscribe:prod` | `.env.prod` | Subscribe mailbox to Graph API notifications (prod) |
+| `npm run build` | — | Compile TypeScript to `dist/` |
+| `npm run type-check` | — | Type-check without emitting files |
+| `npm run clean` | — | Delete the `dist/` folder |
 
-## 🔐 Environment Variables
+### Environment Files
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `BOT_APP_ID` | Microsoft Bot Application ID | ✅ |
-| `BOT_APP_SECRET` | Microsoft Bot Application Secret | ✅ |
-| `TENANT_ID` | Azure AD Tenant ID | ✅ |
-| `OPENAI_API_KEY` | OpenAI API Key | ✅ |
-| `PUBLIC_URL` | Public URL for webhooks | ✅ |
-| `PORT` | Local server port (default: 3978) | ❌ |
-| `GREYTHR_API_URL` | GreytHR API Base URL | ✅ |
-| `GREYTHR_AUTH_URL` | GreytHR Authentication URL | ✅ |
-| `GREYTHR_DOMAIN` | GreytHR Domain ID | ✅ |
-| `GREYTHR_USERNAME` | GreytHR API User | ✅ |
-| `GREYTHR_PASSWORD` | GreytHR API Password | ✅ |
+The bot reads environment variables from a file determined by the `DOTENV_PATH` variable set in each npm script. This means you can maintain completely separate configurations without ever manually swapping `.env` files:
+
+```
+.env.dev    ← used by npm run dev / npm run subscribe
+.env.prod   ← used by npm run prod / npm run subscribe:prod
+.env        ← fallback for npm start (plain node invocations)
+```
+
+> All `.env*` files (except `.env.example`) are gitignored and should never be committed to the repository.
 
 ## 📝 How It Works
 
