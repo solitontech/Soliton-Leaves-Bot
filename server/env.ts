@@ -7,7 +7,8 @@
 import dotenv from "dotenv";
 import type { EnvironmentConfig } from "./types/index.js";
 
-dotenv.config();
+const envFile = process.env['DOTENV_PATH'] ?? '.env';
+dotenv.config({ path: envFile });
 
 /**
  * Environment variables configuration object

@@ -7,9 +7,11 @@
     "scripts": {
         "build": "tsc",
         "start": "node dist/server/server.js",
-        "dev": "tsc && nodemon dist/server/server.js",
+        "dev": "DOTENV_PATH=.env.dev tsc && DOTENV_PATH=.env.dev nodemon dist/server/server.js",
         "dev:watch": "tsc --watch",
-        "subscribe": "node dist/graph-authentication/subscribe.js",
+        "prod": "tsc && DOTENV_PATH=.env.prod node dist/server/server.js",
+        "subscribe": "DOTENV_PATH=.env.dev node dist/graph-authentication/subscribe.js",
+        "subscribe:prod": "DOTENV_PATH=.env.prod node dist/graph-authentication/subscribe.js",
         "type-check": "tsc --noEmit",
         "clean": "rm -rf dist",
         "prebuild": "npm run clean",
