@@ -64,7 +64,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
         // ── Step 1: Resolve the leave-request email from the conversation thread ──
         LOG.info(`🧵 Resolving leave request email from conversation thread...`);
-        const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
+        const { leaveEmail, triggerEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
 
         if (!senderEmail) {
             LOG.error(`❌ No sender email found in resolved leave email`);
@@ -72,8 +72,9 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         }
 
         // Prevent infinite loops: ignore emails sent by the bot itself
-        if (senderEmail.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
-            LOG.info(`⏩ Ignoring email from self (${senderEmail}) to prevent infinite loop.`);
+        const triggerSender = triggerEmail.from?.emailAddress?.address ?? "";
+        if (triggerSender.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
+            LOG.info(`⏩ Ignoring email sent by monitored mailbox (${triggerSender}) to prevent infinite loop.`);
             return;
         }
 

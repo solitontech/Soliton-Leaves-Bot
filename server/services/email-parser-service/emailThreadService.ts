@@ -36,7 +36,7 @@ export async function resolveLeaveEmailFromThread(
 
     if (!conversationId) {
         LOG.warn("⚠️  No conversationId found — using triggered email directly.");
-        return buildResult(triggerEmail);
+        return buildResult(triggerEmail, triggerEmail);
     }
 
     // ── Step 2: Fetch the full conversation thread, sorted oldest-first ────────
@@ -60,11 +60,11 @@ export async function resolveLeaveEmailFromThread(
         LOG.info(`📧 Using oldest email in thread as the leave request (from: ${leaveEmail.from?.emailAddress?.address})`);
     }
 
-    return buildResult(leaveEmail);
+    return buildResult(leaveEmail, triggerEmail);
 }
 
 /** Build a ThreadResolutionResult from an EmailData object. */
-function buildResult(email: EmailData): ThreadResolutionResult {
-    const senderEmail = email.from?.emailAddress?.address ?? "";
-    return { leaveEmail: email, senderEmail };
+function buildResult(leaveEmail: EmailData, triggerEmail: EmailData): ThreadResolutionResult {
+    const senderEmail = leaveEmail.from?.emailAddress?.address ?? "";
+    return { leaveEmail, triggerEmail, senderEmail };
 }
