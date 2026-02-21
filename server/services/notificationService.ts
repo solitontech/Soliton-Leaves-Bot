@@ -278,3 +278,39 @@ export async function sendNoLeaveRequestsNotification(
 
     LOG.info(`📧 "No leave requests found" notification sent to ${senderEmail}`);
 }
+
+export async function sendManagerNotIncludedNotification(
+    email: EmailData,
+    senderEmail: string,
+    managerName: string,
+    managerEmail: string,
+    token: string
+): Promise<void> {
+    LOG.info(`📧 Sending "manager not included" notification to ${senderEmail}...`);
+
+    const message = {
+        message: {
+            subject: `RE: ${email.subject}`,
+            body: {
+                contentType: "HTML",
+                content: `
+                    <p>Hello,</p>
+                    <p><strong>❌ Your leave request could not be processed.</strong></p>
+                    <p>Your manager (<strong>${managerName}</strong> — <a href="mailto:${managerEmail}">${managerEmail}</a>) was not included in the To or CC of your leave request email.</p>
+                    <p>Please resend your leave request and make sure to <strong>include your manager</strong> in the email.</p>
+                    <p>This is an automated notification. Please do not reply to this email.</p>
+                    <p>Best regards,<br/>Leave Management AI</p>
+                `
+            },
+            ...buildReplyRecipients(email, senderEmail),
+        }
+    };
+
+    await axios.post(
+        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.id}/reply`,
+        message,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    );
+
+    LOG.info(`📧 "Manager not included" notification sent to ${senderEmail}`);
+}
