@@ -48,7 +48,8 @@ export async function sendSuccessNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: [{ emailAddress: { address: senderEmail } }]
+            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
+            ccRecipients: email.ccRecipients ?? [],
         }
     };
 
@@ -93,7 +94,8 @@ export async function sendFailureNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: [{ emailAddress: { address: senderEmail } }]
+            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
+            ccRecipients: email.ccRecipients ?? [],
         }
     };
 
@@ -149,7 +151,8 @@ export async function sendMissingFieldsNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: [{ emailAddress: { address: senderEmail } }]
+            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
+            ccRecipients: email.ccRecipients ?? [],
         }
     };
 
@@ -192,7 +195,8 @@ export async function sendErrorNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: [{ emailAddress: { address: senderEmail } }]
+            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
+            ccRecipients: email.ccRecipients ?? [],
         }
     };
 
