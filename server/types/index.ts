@@ -36,11 +36,10 @@ export interface InternetMessageHeader {
     value: string;
 }
 
-// Full resolution result: the identified EmailData and its sender
+// Resolution result: the triggered email and its sender
 export interface ThreadResolutionResult {
-    leaveEmail: EmailData;      // The oldest email in the thread (the original leave request)
-    triggerEmail: EmailData;    // The email that triggered the Graph notification
-    senderEmail: string;        // Sender of the leave email
+    leaveEmail: EmailData;  // The email that triggered the Graph notification
+    sender: string;         // Sender address of the email
 }
 
 export interface EmailContent {

@@ -1,7 +1,6 @@
 /**
  * Email Thread Service
- * Fetches the full conversation thread for an email notification and returns
- * the oldest email in the thread, which is always the original leave request.
+ * Fetches the triggered email and returns it as the leave request email.
  */
 
 import axios from "axios";
@@ -13,10 +12,8 @@ import type {
 } from "../../types/index.js";
 
 /**
- * Given the message ID of the email that triggered the notification:
- * 1. Fetch that email to get its conversationId.
- * 2. Fetch ALL messages in the conversation thread, sorted oldest-first.
- * 3. Return the oldest email (index 0) — this is always the original leave request.
+ * Fetches the email that triggered the Graph notification and returns it
+ * directly as the leave request email.
  */
 export async function resolveLeaveEmailFromThread(
     messageId: string,
@@ -25,47 +22,13 @@ export async function resolveLeaveEmailFromThread(
     const headers = { Authorization: `Bearer ${token}` };
     const baseUrl = `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}`;
 
-    // ── Step 1: Fetch the triggered email to get its conversationId ────────────
     LOG.info(`📧 Fetching triggered email: ${messageId}`);
-    const triggerResponse = await axios.get<EmailData>(
+    const response = await axios.get<EmailData>(
         `${baseUrl}/messages/${messageId}`,
         { headers }
     );
-    const triggerEmail = triggerResponse.data;
-    const conversationId = triggerEmail.conversationId;
+    const email = response.data;
+    const sender = email.from?.emailAddress?.address ?? "";
 
-    if (!conversationId) {
-        LOG.warn("⚠️  No conversationId found — using triggered email directly.");
-        return buildResult(triggerEmail, triggerEmail);
-    }
-
-    // ── Step 2: Fetch the full conversation thread, sorted oldest-first ────────
-    LOG.info(`🧵 Fetching conversation thread: ${conversationId}`);
-    const threadResponse = await axios.get<{ value: EmailData[] }>(
-        `${baseUrl}/messages?$filter=conversationId eq '${conversationId}'&$select=id,subject,from,toRecipients,ccRecipients,body,bodyPreview,receivedDateTime,conversationId`,
-        { headers }
-    );
-
-    // Sort oldest-first in memory ($orderby combined with $filter causes a 400 on Graph API)
-    const threadEmails = threadResponse.data.value.sort(
-        (a, b) => new Date(a.receivedDateTime).getTime() - new Date(b.receivedDateTime).getTime()
-    );
-
-    LOG.info(`🧵 Found ${threadEmails.length} email(s) in conversation thread`);
-
-    // ── Step 3: The oldest email is always the original leave request ──────────
-    const leaveEmail = threadEmails[0] ?? triggerEmail;
-
-    if (threadEmails.length > 1) {
-        LOG.info(`📧 Using oldest email in thread as the leave request (from: ${leaveEmail.from?.emailAddress?.address})`);
-        LOG.info(`📧 Resolved leave email: ${JSON.stringify({ subject: leaveEmail.subject, from: leaveEmail.from, receivedDateTime: leaveEmail.receivedDateTime, bodyPreview: leaveEmail.bodyPreview }, null, 2)}`);
-    }
-
-    return buildResult(leaveEmail, triggerEmail);
-}
-
-/** Build a ThreadResolutionResult from an EmailData object. */
-function buildResult(leaveEmail: EmailData, triggerEmail: EmailData): ThreadResolutionResult {
-    const senderEmail = leaveEmail.from?.emailAddress?.address ?? "";
-    return { leaveEmail, triggerEmail, senderEmail };
+    return { leaveEmail: email, sender };
 }

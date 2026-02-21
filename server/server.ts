@@ -62,31 +62,30 @@ app.post("/email-notification", async (req: Request, res: Response) => {
     try {
         const token = await getGraphToken();
 
-        // ── Step 1: Resolve the leave-request email from the conversation thread ──
-        LOG.info(`🧵 Resolving leave request email from conversation thread...`);
-        const { leaveEmail, triggerEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
+        // ── Step 1: Fetch the triggered email ──────────────────────────────────────
+        LOG.info(`📧 Fetching leave request email...`);
+        const { leaveEmail, sender } = await resolveLeaveEmailFromThread(messageId, token);
 
-        if (!senderEmail) {
-            LOG.error(`❌ No sender email found in resolved leave email`);
+        if (!sender) {
+            LOG.error(`❌ No sender found in email`);
             return;
         }
 
         // Prevent infinite loops: ignore emails sent by the bot itself
-        const triggerSender = triggerEmail.from?.emailAddress?.address ?? "";
-        if (triggerSender.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
-            LOG.info(`⏩ Ignoring email sent by monitored mailbox (${triggerSender}) to prevent infinite loop.`);
+        if (sender.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
+            LOG.info(`⏩ Ignoring email sent by monitored mailbox (${sender}) to prevent infinite loop.`);
             return;
         }
 
-        LOG.info(`📧 Processing leave request from: ${senderEmail}`);
+        LOG.info(`📧 Processing leave request from: ${sender}`);
 
         // ── Create a per-request file logger ─────────────────────────────────────
-        // File: logs/{year}/{YYYY-MM-DD_senderEmail}.log
-        const leaveLogger = createLeaveLogger(leaveEmail.receivedDateTime, senderEmail);
+        const leaveLogger = createLeaveLogger(leaveEmail.receivedDateTime, sender);
         leaveLogger.info(`===== Leave Request Processing Started =====`);
-        leaveLogger.info(`Sender   : ${senderEmail}`);
+        leaveLogger.info(`Sender   : ${sender}`);
         leaveLogger.info(`Subject  : ${leaveEmail.subject}`);
         leaveLogger.info(`MessageId: ${messageId}`);
+
 
         try {
             // ── Step 2: Parse the leave request(s) from the resolved email ───────────
@@ -97,7 +96,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
             // ── Step 3: Get employee details from GreytHR (once for all requests) ────
             leaveLogger.info(`👤 Fetching employee details from GreytHR...`);
-            const employee = await getEmployeeByEmail(senderEmail);
+            const employee = await getEmployeeByEmail(sender);
 
             // ── Steps 4 & 5: Process each leave request independently ────────────────
             for (let i = 0; i < leaveRequests.length; i++) {
@@ -111,15 +110,15 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
                     if (result.success) {
                         leaveLogger.info(`✅ Leave application${label} submitted successfully!`);
-                        await sendSuccessNotification(leaveEmail, senderEmail, employee, leaveRequest, token);
+                        await sendSuccessNotification(leaveEmail, sender, employee, leaveRequest, token);
                     } else {
                         leaveLogger.error(`❌ Leave application${label} failed!`);
-                        await sendFailureNotification(leaveEmail, senderEmail, employee, result, token);
+                        await sendFailureNotification(leaveEmail, sender, employee, result, token);
                     }
                 } catch (leaveError) {
                     const le = leaveError as Error;
                     leaveLogger.error(`❌ Error processing leave application${label}: ${le.message}`);
-                    await sendErrorNotification(leaveEmail, senderEmail, le.message, token);
+                    await sendErrorNotification(leaveEmail, sender, le.message, token);
                 }
             }
 
@@ -136,9 +135,9 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             LOG.error(`❌ Missing required fields: ${err.missingFields.join(', ')}`);
             try {
                 const token = await getGraphToken();
-                const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
-                if (senderEmail) {
-                    await sendMissingFieldsNotification(leaveEmail, senderEmail, err.missingFields, token);
+                const { leaveEmail, sender } = await resolveLeaveEmailFromThread(messageId, token);
+                if (sender) {
+                    await sendMissingFieldsNotification(leaveEmail, sender, err.missingFields, token);
                 }
             } catch (notificationError) {
                 LOG.error(`⚠️  Failed to send missing fields notification`);
@@ -150,9 +149,9 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         LOG.error(`❌ Error processing email notification: ${err.message}`);
         try {
             const token = await getGraphToken();
-            const { leaveEmail, senderEmail } = await resolveLeaveEmailFromThread(messageId, token);
-            if (senderEmail) {
-                await sendErrorNotification(leaveEmail, senderEmail, err.message, token);
+            const { leaveEmail, sender } = await resolveLeaveEmailFromThread(messageId, token);
+            if (sender) {
+                await sendErrorNotification(leaveEmail, sender, err.message, token);
             }
         } catch (notificationError) {
             LOG.error(`⚠️  Failed to send error notification`);
