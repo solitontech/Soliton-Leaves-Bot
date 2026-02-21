@@ -24,9 +24,24 @@ For each leave request extract:
 7. To Session (optional): Session number for the end date (integer, 1 is first half of the day, 2 is second half of the day)
 
 Email Details:
-From: ${emailContent.from} (same for every leave request)
+From: ${emailContent.from}
 Subject: ${emailContent.subject}
 Body: ${emailContent.bodyPreview || emailContent.body}
+
+**Detecting forwarded or replied emails:**
+The email body may contain a forwarded or replied message. Look for patterns like:
+- "---------- Forwarded message ---------"
+- "-----Original Message-----"
+- Lines starting with "From:" followed by a name/email inside the body
+- Lines like "Begin forwarded message:"
+- A quoted block (lines starting with ">")
+
+If you detect that this is a forwarded or reply email where someone is looping in the leave AI on behalf of another employee:
+- Look for the ORIGINAL sender inside the forwarded/quoted block (a "From:" line in the body).
+- Use THAT email address as the "fromEmail" for the leave request — NOT the outer sender (${emailContent.from}).
+- The leave request details (dates, type, etc.) should also be extracted from the forwarded/original email content.
+
+If you do NOT detect any forwarded or reply content, use the outer sender (${emailContent.from}) as the fromEmail for every leave request.
 
 Please respond ONLY with a valid JSON array. Even if there is only one leave request, wrap it in an array.
 [
@@ -56,4 +71,5 @@ Important:
     - If people mention they are requesting leave from "afternoon session" of fromDate to "second half" of toDate that means they are requesting fromSession 2 of fromDate and toSession 2 of toDate
     - If people mention they are requesting leave from "second half" of fromDate to "forenoon" of toDate that means they are requesting fromSession 2 of fromDate and toSession 1 of toDate
 - If you cannot determine any field with confidence, use null for that field.`;
+
 }
