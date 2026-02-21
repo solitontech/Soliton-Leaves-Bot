@@ -24,7 +24,7 @@ For each leave request extract:
 7. To Session (optional): Session number for the end date (integer, 1 is first half of the day, 2 is second half of the day)
 
 Email Details:
-From: ${emailContent.from}
+From: ${emailContent.from} (same for every leave request)
 Subject: ${emailContent.subject}
 Body: ${emailContent.bodyPreview || emailContent.body}
 
