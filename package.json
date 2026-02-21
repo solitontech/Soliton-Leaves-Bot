@@ -12,6 +12,8 @@
         "prod": "tsc && DOTENV_PATH=.env.prod node dist/server/server.js",
         "subscribe": "DOTENV_PATH=.env.dev node dist/graph-authentication/subscribe.js",
         "subscribe:prod": "DOTENV_PATH=.env.prod node dist/graph-authentication/subscribe.js",
+        "delete-sub": "DOTENV_PATH=.env.dev node dist/graph-authentication/deleteSubscriptions.js",
+        "delete-sub:prod": "DOTENV_PATH=.env.prod node dist/graph-authentication/deleteSubscriptions.js",
         "type-check": "tsc --noEmit",
         "clean": "rm -rf dist",
         "prebuild": "npm run clean",
