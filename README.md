@@ -57,11 +57,6 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
    ```bash
    npm start
    ```
-   
-   For development with auto-reload:
-   ```bash
-   npm run dev
-   ```
 
 ## 🔐 Environment Variables
 
@@ -85,6 +80,11 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
 
 To run the application and ngrok persistently (so they don't stop when you close your terminal), follow these steps:
 
+1. Run the app
+2. Run ngrok
+3. Update the `PUBLIC_URL` env variable with the ngrok public URL, then restart the server and restart ngrok
+4. Subscribe to mailbox notifications
+
 ### Running the App
 **Option 1: Using tmux (Recommended)**
 1. Use **`tmux`** to create a persistent session:
@@ -93,7 +93,7 @@ To run the application and ngrok persistently (so they don't stop when you close
    ```
 2. Inside the session, start the app:
    ```bash
-   npm start
+   npm run prod
    ```
 3. To detach (leave it running in background), press `Ctrl+B`, then `D`.
 4. To check on it later, running: `tmux attach -t bot`
@@ -101,13 +101,10 @@ To run the application and ngrok persistently (so they don't stop when you close
 **Option 2: Using nohup (Simpler)**
 To run the app in the background:
 ```bash
-nohup npm start &
+nohup npm run prod &
 ```
 - To stop it, find the process ID: `pgrep -fl "node dist/server/server.js"`
 - Kill the process: `kill <PID>`
-
-### Running Ngrok (For Testing/Development)
-**Note:** Ngrok is primarily for testing and development. The free version changes the URL every time it restarts, so you will need to update your `PUBLIC_URL` in `.env` and re-run `npm run subscribe` if the ngrok process stops.
 
 **Option 1: Using tmux (Recommended)**
 1. Start a new tmux session (or split your existing one):
@@ -126,6 +123,7 @@ If you don't want to use tmux, you can run ngrok in the background:
 nohup ngrok http <port number> > /dev/null 2>&1 &
 ```
 - To find the public URL, run: `curl http://localhost:4040/api/tunnels`
+- **Important**:Replace the `PUBLIC_URL` env variable with the above public URL, then restart the server and restart ngrok
 - To stop it, find the process ID with `pgrep ngrok` and run `kill <PID>`.
 
 ### Stopping the Persistent Processes
@@ -133,7 +131,63 @@ nohup ngrok http <port number> > /dev/null 2>&1 &
 2. Press `Ctrl+C` to stop the process.
 3. Type `exit` to close the session.
 
-## 📦 Dependencies
+### Subscribe to Mailbox Notifications
+
+> ⚠️ **This step is required every time you start the server for the first time, or whenever the webhook subscription expires.**
+
+Once the app is running (and ngrok is running for dev), register the webhook with Microsoft Graph so it knows where to send email notifications:
+
+**Development:**
+```bash
+npm run subscribe
+```
+
+**Production:**
+```bash
+npm run subscribe:prod
+```
+
+## Automating Subscription Renewal (Cron Job)
+
+Microsoft Graph webhook subscriptions expire after **7 days** (the maximum allowed). You need to re-run `subscribe` regularly to keep the bot receiving email notifications.
+
+### Setup
+
+**1. Find the full paths** you'll need:
+```bash
+which npm          # e.g. /usr/bin/npm
+cd Soliton-Leaves-Bot && pwd   # e.g. /home/youruser/Soliton-Leaves-Bot
+```
+
+**2. Open the crontab editor:**
+```bash
+crontab -e
+```
+
+**3. Add the following entry** (replacing the paths with yours):
+```cron
+0 2 */1 * * cd /home/youruser/Soliton-Leaves-Bot && /usr/bin/npm run subscribe:prod >> logs/subscription/cron.log 2>&1
+```
+
+This runs the subscription renewal at **2:00 AM every day**, and appends all output to `logs/subscription/cron.log` for auditing.
+
+**4. Verify it was saved:**
+```bash
+crontab -l
+```
+
+### Checking the Logs
+- **Cron output**: `logs/subscription/cron.log` — stdout and stderr from each cron run
+- **Latest subscription**: `logs/subscription/subscription.json` — the full subscription object returned by Microsoft Graph, overwritten on each successful run (useful for checking the expiry date and subscription ID)
+
+### Testing the Cron Command
+Before relying on the cron job, verify it works manually:
+```bash
+cd /home/youruser/Soliton-Leaves-Bot && /usr/bin/npm run subscribe:prod
+```
+If it succeeds, the cron job will too.
+
+## �📦 Dependencies
 
 ### Production Dependencies
 - **@microsoft/botbuilder** (^4.22.0) - Microsoft Bot Framework SDK
