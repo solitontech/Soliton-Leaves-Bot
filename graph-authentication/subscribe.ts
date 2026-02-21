@@ -6,11 +6,43 @@ import env from "../server/env.js";
 import logger from "../server/services/loggerService.js";
 import type { GraphSubscription } from "../server/types/index.js";
 
+
+async function deleteExistingSubscriptions(token: string): Promise<void> {
+    const headers = { Authorization: `Bearer ${token}` };
+
+    logger.info("🔍 Checking for existing subscriptions...");
+    const res = await axios.get<{ value: GraphSubscription[] }>(
+        "https://graph.microsoft.com/v1.0/subscriptions",
+        { headers }
+    );
+
+    const existing = res.data.value;
+    if (existing.length === 0) {
+        logger.info("✅ No existing subscriptions found.");
+        return;
+    }
+
+    logger.info(`🗑️  Found ${existing.length} existing subscription(s). Deleting...`);
+    await Promise.all(
+        existing.map(async (sub) => {
+            await axios.delete(
+                `https://graph.microsoft.com/v1.0/subscriptions/${sub.id}`,
+                { headers }
+            );
+            logger.info(`   🗑️  Deleted subscription: ${sub.id}`);
+        })
+    );
+    logger.info("✅ All existing subscriptions deleted.");
+}
+
 async function subscribeToMailbox(): Promise<void> {
     try {
         logger.info("🔐 Getting Graph API token...");
         const token = await getGraphToken();
         logger.info("✅ Token obtained successfully");
+
+        // Clean up any existing subscriptions before creating a new one
+        await deleteExistingSubscriptions(token);
 
         const notificationUrl = env.PUBLIC_URL + "/email-notification";
         logger.info("📍 Notification URL:", notificationUrl);
