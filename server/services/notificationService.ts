@@ -14,6 +14,30 @@ import type {
 } from "../types/index.js";
 
 /**
+ * Build the reply recipient lists for a notification email.
+ * - To:  always the original sender (A)
+ * - CC:  everyone from the original To + CC, excluding the monitored mailbox and the sender
+ *        (avoids emailing the bot itself and avoids duplicating the sender in CC)
+ */
+function buildReplyRecipients(email: EmailData, senderEmail: string) {
+    const monitoredLower = env.MONITORED_EMAIL.toLowerCase();
+    const senderLower = senderEmail.toLowerCase();
+
+    const allOthers = [
+        ...(email.toRecipients ?? []),
+        ...(email.ccRecipients ?? []),
+    ].filter(r => {
+        const addr = r.emailAddress.address.toLowerCase();
+        return addr !== monitoredLower && addr !== senderLower;
+    });
+
+    return {
+        toRecipients: [{ emailAddress: { address: senderEmail } }],
+        ccRecipients: allOthers,
+    };
+}
+
+/**
  * Send success notification email to the leave requester
  * @param email - The original email
  * @param senderEmail - Recipient email address
@@ -48,8 +72,7 @@ export async function sendSuccessNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
-            ccRecipients: email.ccRecipients ?? [],
+            ...buildReplyRecipients(email, senderEmail),
         }
     };
 
@@ -94,8 +117,7 @@ export async function sendFailureNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
-            ccRecipients: email.ccRecipients ?? [],
+            ...buildReplyRecipients(email, senderEmail),
         }
     };
 
@@ -151,8 +173,7 @@ export async function sendMissingFieldsNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
-            ccRecipients: email.ccRecipients ?? [],
+            ...buildReplyRecipients(email, senderEmail),
         }
     };
 
@@ -195,8 +216,7 @@ export async function sendErrorNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            toRecipients: email.toRecipients ?? [{ emailAddress: { address: senderEmail } }],
-            ccRecipients: email.ccRecipients ?? [],
+            ...buildReplyRecipients(email, senderEmail),
         }
     };
 
