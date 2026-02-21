@@ -67,7 +67,7 @@ async function subscribeToMailbox(): Promise<void> {
             {
                 changeType: "created",
                 notificationUrl: notificationUrl,
-                resource: `users/${env.MONITORED_EMAIL}/mailFolders/inbox/messages`,
+                resource: `users/${env.MONITORED_EMAIL}/messages`,
                 expirationDateTime: expirationDateTime,
                 clientState: "YOUR_SECRET_STATE"
             },
