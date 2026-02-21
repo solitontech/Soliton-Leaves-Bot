@@ -42,10 +42,14 @@ export async function resolveLeaveEmailFromThread(
     // ── Step 2: Fetch the full conversation thread, sorted oldest-first ────────
     LOG.info(`🧵 Fetching conversation thread: ${conversationId}`);
     const threadResponse = await axios.get<{ value: EmailData[] }>(
-        `${baseUrl}/messages?$filter=conversationId eq '${conversationId}'&$orderby=receivedDateTime asc&$select=id,subject,from,toRecipients,ccRecipients,body,bodyPreview,receivedDateTime,conversationId`,
+        `${baseUrl}/messages?$filter=conversationId eq '${conversationId}'&$select=id,subject,from,toRecipients,ccRecipients,body,bodyPreview,receivedDateTime,conversationId`,
         { headers }
     );
-    const threadEmails = threadResponse.data.value;
+
+    // Sort oldest-first in memory ($orderby combined with $filter causes a 400 on Graph API)
+    const threadEmails = threadResponse.data.value.sort(
+        (a, b) => new Date(a.receivedDateTime).getTime() - new Date(b.receivedDateTime).getTime()
+    );
 
     LOG.info(`🧵 Found ${threadEmails.length} email(s) in conversation thread`);
 
