@@ -80,10 +80,12 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
 
 To run the application and ngrok persistently (so they don't stop when you close your terminal), follow these steps:
 
-1. Run the app
-2. Run ngrok
-3. Update the `PUBLIC_URL` env variable with the ngrok public URL, then restart the server and restart ngrok
-4. Subscribe to mailbox notifications
+**Summary:**
+1. Create the following folders under the project root: `logs, logs/<year>, logs/subscription`
+2. Run the app
+3. Run ngrok
+4. Update the `PUBLIC_URL` env variable with the ngrok public URL, then restart the server and restart ngrok
+5. Subscribe to mailbox notifications
 
 ### Running the App
 **Option 1: Using tmux (Recommended)**
