@@ -98,30 +98,33 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             leaveLogger.info(`👤 Fetching employee details from GreytHR for: ${leaveRequesterEmail}`);
             const employee = await getEmployeeByEmail(leaveRequesterEmail);
 
-            // ── Step 4: Validate that the employee's manager is on the email ────────
-            leaveLogger.info(`🌳 Fetching org tree to verify manager inclusion...`);
-            const orgTree = await getEmployeeOrgTree(employee.employeeId);
-            const immediateManager = orgTree[0];
+            // ── Step 4: Validate manager inclusion (if MANAGER_REQUIRED=true) ──────
+            if (env.MANAGER_REQUIRED) {
+                leaveLogger.info(`🌳 Fetching org tree to verify manager inclusion...`);
+                const orgTree = await getEmployeeOrgTree(employee.employeeId);
+                const immediateManager = orgTree[0];
 
-            if (!immediateManager) {
-                leaveLogger.warn(`⚠️  No manager found in org tree — skipping manager check.`);
-            } else {
-                const manager = await getEmployeeById(String(immediateManager.manager.employeeId));
-                const managerEmailLower = manager.email.toLowerCase();
+                if (!immediateManager) {
+                    leaveLogger.warn(`⚠️  No manager found in org tree — skipping manager check.`);
+                } else {
+                    const manager = await getEmployeeById(String(immediateManager.manager.employeeId));
+                    const managerEmailLower = manager.email.toLowerCase();
 
-                const allRecipients = [
-                    ...(leaveEmail.toRecipients ?? []),
-                    ...(leaveEmail.ccRecipients ?? []),
-                ].map(r => r.emailAddress.address.toLowerCase());
+                    const allRecipients = [
+                        ...(leaveEmail.toRecipients ?? []),
+                        ...(leaveEmail.ccRecipients ?? []),
+                    ].map(r => r.emailAddress.address.toLowerCase());
 
-                if (!allRecipients.includes(managerEmailLower)) {
-                    leaveLogger.warn(`❌ Manager (${manager.email}) not found in To/CC. Rejecting leave request.`);
-                    await sendManagerNotIncludedNotification(leaveEmail, sender, manager.name, manager.email, token);
-                    return;
+                    if (!allRecipients.includes(managerEmailLower)) {
+                        leaveLogger.warn(`❌ Manager (${manager.email}) not found in To/CC. Rejecting leave request.`);
+                        await sendManagerNotIncludedNotification(leaveEmail, sender, manager.name, manager.email, token);
+                        return;
+                    }
+
+                    leaveLogger.info(`✅ Manager (${manager.name}) verified in email recipients.`);
                 }
-
-                leaveLogger.info(`✅ Manager (${manager.name}) verified in email recipients.`);
             }
+
 
             // ── Steps 5 & 6: Process each leave request independently ─────────────────
             for (let i = 0; i < leaveRequests.length; i++) {

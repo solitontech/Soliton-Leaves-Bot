@@ -36,6 +36,9 @@ const env: EnvironmentConfig = {
     // Default leave type (used when the email does not specify one)
     DEFAULT_LEAVE_TYPE: process.env['DEFAULT_LEAVE_TYPE'] || 'Sick Leave',
 
+    // Manager inclusion check (set to 'true' to require manager in leave request email)
+    MANAGER_REQUIRED: process.env['MANAGER_REQUIRED'] === 'true',
+
     // SSL Certificate Configuration (optional, for HTTPS)
     SSL_KEY_PATH: process.env['SSL_KEY_PATH'],
     SSL_CERT_PATH: process.env['SSL_CERT_PATH'],

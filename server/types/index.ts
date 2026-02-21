@@ -256,6 +256,9 @@ export interface EnvironmentConfig {
     // Default leave type when none is specified in the email
     DEFAULT_LEAVE_TYPE: string;
 
+    // Whether the employee's manager must be included in the leave request email
+    MANAGER_REQUIRED: boolean;
+
     // SSL Certificate Configuration
     SSL_KEY_PATH?: string;
     SSL_CERT_PATH?: string;
