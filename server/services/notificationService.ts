@@ -133,14 +133,18 @@ export async function sendMissingFieldsNotification(
                     <ul>
                         ${missingFields.map(field => `<li><strong>${field}</strong></li>`).join('')}
                     </ul>
+                    <p>The required fields are inferred from your email. But I am just an AI so i can make mistakes. If you are sure that all information is provided and the inference is wrong then you can send the required information explicitly to make it clearer.</p>
                     <p><strong>Required fields for a leave request:</strong></p>
                     <ul>
                         <li><strong>From Date</strong> - Start date of your leave</li>
                         <li><strong>To Date</strong> - End date of your leave</li>
                         <li><strong>Leave Type</strong> - Type of leave (e.g., Sick Leave, Privilege Leave)</li>
                         <li><strong>Transaction Type</strong> - Either "availed" (applying for leave) or "cancelled" (cancelling leave)</li>
+                        <li><strong>[OPTIONAL] From Session</strong> - 1 or 2 (First half / morning session or second half / afternoon session of the day)</li>
+                        <li><strong>[OPTIONAL] To Session</strong> - 1 or 2 (First half / morning session or second half / afternoon session of the day)</li>
                     </ul>
                     <p>Please send a new email with all the required information.</p>
+                    <p>If you are requesting multiple leave simultaneously, please provide all required information individually for each leave request.</p>
                     <p>This is an automated notification. Please do not reply to this email.</p>
                     <p>Best regards,<br/>Leave Management AI</p>
                 `

@@ -58,6 +58,7 @@ export async function resolveLeaveEmailFromThread(
 
     if (threadEmails.length > 1) {
         LOG.info(`📧 Using oldest email in thread as the leave request (from: ${leaveEmail.from?.emailAddress?.address})`);
+        LOG.info(`📧 Resolved leave email: ${JSON.stringify({ subject: leaveEmail.subject, from: leaveEmail.from, receivedDateTime: leaveEmail.receivedDateTime, bodyPreview: leaveEmail.bodyPreview }, null, 2)}`);
     }
 
     return buildResult(leaveEmail, triggerEmail);
