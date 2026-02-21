@@ -228,3 +228,53 @@ export async function sendErrorNotification(
 
     LOG.info(`📧 Error notification sent to ${senderEmail}`);
 }
+
+/**
+ * Send notification when no leave requests or cancellations were found in the email
+ * @param email - The original email
+ * @param senderEmail - Recipient email address
+ * @param token - Graph API access token
+ */
+export async function sendNoLeaveRequestsNotification(
+    email: EmailData,
+    senderEmail: string,
+    token: string
+): Promise<void> {
+    LOG.info(`📧 Sending "no leave requests found" notification to ${senderEmail}...`);
+
+    const message = {
+        message: {
+            subject: `RE: ${email.subject}`,
+            body: {
+                contentType: "HTML",
+                content: `
+                    <p>Hello,</p>
+                    <p><strong>⚠️ No leave request or cancellation was found in your email.</strong></p>
+                    <p>The AI was unable to identify any leave request or cancellation in the email you sent. This could be because:</p>
+                    <ul>
+                        <li>The email did not contain leave request details</li>
+                        <li>The leave information was unclear or ambiguous</li>
+                    </ul>
+                    <p>If you intended to apply for or cancel a leave, please send a new email with the following details clearly stated:</p>
+                    <ul>
+                        <li><strong>From Date</strong> - Start date of your leave</li>
+                        <li><strong>To Date</strong> - End date of your leave</li>
+                        <li><strong>Leave Type</strong> - e.g., Sick Leave, Privilege Leave, Casual Leave</li>
+                        <li><strong>Transaction</strong> - "availed" to apply or "cancelled" to cancel</li>
+                    </ul>
+                    <p>This is an automated notification. Please do not reply to this email.</p>
+                    <p>Best regards,<br/>Leave Management AI</p>
+                `
+            },
+            ...buildReplyRecipients(email, senderEmail),
+        }
+    };
+
+    await axios.post(
+        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.id}/reply`,
+        message,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    );
+
+    LOG.info(`📧 "No leave requests found" notification sent to ${senderEmail}`);
+}

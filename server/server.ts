@@ -9,7 +9,8 @@ import {
     sendSuccessNotification,
     sendFailureNotification,
     sendErrorNotification,
-    sendMissingFieldsNotification
+    sendMissingFieldsNotification,
+    sendNoLeaveRequestsNotification
 } from "./services/notificationService.js";
 import env from "./env.js";
 import LOG, { createLeaveLogger } from "./services/loggerService.js";
@@ -66,37 +67,35 @@ app.post("/email-notification", async (req: Request, res: Response) => {
         LOG.info(`📧 Fetching leave request email...`);
         const { leaveEmail, sender } = await resolveLeaveEmailFromThread(messageId, token);
 
-        if (!sender) {
-            LOG.error(`❌ No sender found in email`);
-            return;
-        }
-
         // Prevent infinite loops: ignore emails sent by the bot itself
         if (sender.toLowerCase() === env.MONITORED_EMAIL.toLowerCase()) {
             LOG.info(`⏩ Ignoring email sent by monitored mailbox (${sender}) to prevent infinite loop.`);
             return;
         }
 
-        LOG.info(`📧 Processing leave request from: ${sender}`);
-
         // ── Create a per-request file logger ─────────────────────────────────────
         const leaveLogger = createLeaveLogger(leaveEmail.receivedDateTime, sender);
         leaveLogger.info(`===== Leave Request Processing Started =====`);
-        leaveLogger.info(`Sender   : ${sender}`);
-        leaveLogger.info(`Subject  : ${leaveEmail.subject}`);
-        leaveLogger.info(`MessageId: ${messageId}`);
-
 
         try {
             // ── Step 2: Parse the leave request(s) from the resolved email ───────────
             leaveLogger.info(`🤖 Parsing leave request(s) with AI...`);
             const leaveRequests = await parseLeaveRequest(leaveEmail);
 
+            if (leaveRequests.length === 0) {
+                leaveLogger.warn(`⚠️  No leave requests or cancellations found in email. Notifying sender.`);
+                await sendNoLeaveRequestsNotification(leaveEmail, sender, token);
+                return;
+            }
+
             leaveLogger.info(`🗓️  Found ${leaveRequests.length} leave request(s) to process`);
 
             // ── Step 3: Get employee details from GreytHR (once for all requests) ────
-            leaveLogger.info(`👤 Fetching employee details from GreytHR...`);
-            const employee = await getEmployeeByEmail(sender);
+            // Use the email from the first leave request — the AI resolves the actual
+            // employee's email (handles forwarded emails where forwarder ≠ leave requester)
+            const leaveRequesterEmail = leaveRequests[0]!.fromEmail;
+            leaveLogger.info(`👤 Fetching employee details from GreytHR for: ${leaveRequesterEmail}`);
+            const employee = await getEmployeeByEmail(leaveRequesterEmail);
 
             // ── Steps 4 & 5: Process each leave request independently ────────────────
             for (let i = 0; i < leaveRequests.length; i++) {

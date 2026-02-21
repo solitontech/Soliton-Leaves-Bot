@@ -15,7 +15,7 @@ export function getLeaveRequestPrompt(emailContent: EmailContent): string {
 Analyze the following email and extract ALL leave requests mentioned. An employee may request multiple leaves in a single email (e.g., different date ranges, different leave types, or multiple individual days).
 
 For each leave request extract:
-1. From email address
+1. From email address (each and every leave quest in a single email can only be from a single employee, so all email addresses for each leave request will be the same)
 2. Type of leave request (e.g., Sick Leave, Casual Leave, Privilege Leave, Comp off, etc.)
 3. Leave dates (from date and to date)
 4. Transaction type: either "availed" (applying for leave) or "cancelled" (cancelling a leave).
