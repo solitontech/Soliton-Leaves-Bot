@@ -1,4 +1,6 @@
 import axios, { AxiosError } from "axios";
+import fs from "fs";
+import path from "path";
 import getGraphToken from "./graphAuth.js";
 import env from "../server/env.js";
 import logger from "../server/services/loggerService.js";
@@ -44,6 +46,14 @@ async function subscribeToMailbox(): Promise<void> {
 
         logger.info("✅ Subscription created successfully!");
         logger.info("📋 Subscription details:", JSON.stringify(res.data, null, 2));
+
+        // Save subscription details to logs/subscription/subscription.json
+        const subscriptionDir = path.resolve("logs", "subscription");
+        fs.mkdirSync(subscriptionDir, { recursive: true });
+        const subscriptionFile = path.join(subscriptionDir, "subscription.json");
+        fs.writeFileSync(subscriptionFile, JSON.stringify(res.data, null, 2), "utf-8");
+        logger.info(`💾 Subscription saved to: ${subscriptionFile}`);
+
         logger.info("\n🎉 Your webhook is now active and will receive email notifications!");
     } catch (error) {
         const err = error as AxiosError<any>;
