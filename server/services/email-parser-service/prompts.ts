@@ -30,18 +30,16 @@ Body: ${emailContent.bodyPreview || emailContent.body}
 
 **Detecting forwarded or replied emails:**
 The email body may contain a forwarded or replied message. Look for patterns like:
-- "---------- Forwarded message ---------"
-- "-----Original Message-----"
-- Lines starting with "From:" followed by a name/email inside the body
-- Lines like "Begin forwarded message:"
-- A quoted block (lines starting with ">")
+- "Re:" in the subject line
+- "Fwd:" or "FW:" in the subject line
+- Lines starting with "From:" followed by a name/email inside the body, that are then followed by a date or a "To:" email address
 
 If you detect that this is a forwarded or reply email where someone is looping in the leave AI on behalf of another employee:
 - Look for the ORIGINAL sender inside the forwarded/quoted block (a "From:" line in the body).
 - Use THAT email address as the "fromEmail" for the leave request — NOT the outer sender (${emailContent.from}).
 - The leave request details (dates, type, etc.) should also be extracted from the forwarded/original email content.
 
-If you do NOT detect any forwarded or reply content, use the outer sender (${emailContent.from}) as the fromEmail for every leave request.
+If you do NOT detect any forwarded or reply content, use the email address of thr sender (${emailContent.from}) as the fromEmail for every leave request.
 
 Please respond ONLY with a valid JSON array. Even if there is only one leave request, wrap it in an array.
 [
