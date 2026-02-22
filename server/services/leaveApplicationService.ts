@@ -19,12 +19,12 @@ export async function processLeaveApplication(
     try {
         logger.processingLeaveApplicationHeader();
 
-        const employeeNo = employee.employeeId;
+        const employeeId = employee.employeeId;
         const employeeName = employee.name;
-        const solitonEmployeeId = employee.employeeNo;
+        const employeeNo = employee.employeeNo;
 
         // Step 2: Prepare leave application with EXACT fields required by GreytHR
-        logger.employeeDetails(employeeNo, employeeName, solitonEmployeeId);
+        logger.employeeDetails(employeeId, employeeName, employeeNo);
         logger.stepPreparingLeaveApplication(leaveRequest);
 
         // Ensure dates are not null before sending to GreytHR
@@ -33,7 +33,7 @@ export async function processLeaveApplication(
         }
 
         const leaveApplication: GreytHRLeaveApplication = {
-            employeeNo: solitonEmployeeId,
+            employeeNo: employeeNo,
             fromDate: leaveRequest.fromDate,
             toDate: leaveRequest.toDate,
             leaveTypeDescription: leaveRequest.leaveType,
