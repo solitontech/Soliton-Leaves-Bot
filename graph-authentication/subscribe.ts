@@ -6,6 +6,17 @@ import env from "../server/env.js";
 import logger from "../server/services/loggerService.js";
 import type { GraphSubscription } from "../server/types/index.js";
 
+const SUBSCRIPTION_DIR = path.resolve("logs", "subscription");
+const SUBSCRIPTION_FILE = path.join(SUBSCRIPTION_DIR, "subscription.json");
+
+/** Write the result (success or error) to subscription.json with a timestamp header */
+function writeSubscriptionLog(content: string): void {
+    const timestamp = new Date().toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+    const output = `Time of update: ${timestamp}\n${content}\n`;
+    fs.mkdirSync(SUBSCRIPTION_DIR, { recursive: true });
+    fs.writeFileSync(SUBSCRIPTION_FILE, output, "utf-8");
+    logger.info(`💾 Subscription log saved to: ${SUBSCRIPTION_FILE}`);
+}
 
 async function deleteExistingSubscriptions(token: string): Promise<void> {
     const headers = { Authorization: `Bearer ${token}` };
@@ -79,39 +90,28 @@ async function subscribeToMailbox(): Promise<void> {
         logger.info("✅ Subscription created successfully!");
         logger.info("📋 Subscription details:", JSON.stringify(res.data, null, 2));
 
-        // Save subscription details to logs/subscription/subscription.json
-        const subscriptionDir = path.resolve("logs", "subscription");
-        fs.mkdirSync(subscriptionDir, { recursive: true });
-        const subscriptionFile = path.join(subscriptionDir, "subscription.json");
-        fs.writeFileSync(subscriptionFile, JSON.stringify(res.data, null, 2), "utf-8");
-        logger.info(`💾 Subscription saved to: ${subscriptionFile}`);
+        writeSubscriptionLog(JSON.stringify(res.data, null, 2));
 
         logger.info("\n🎉 Your webhook is now active and will receive email notifications!");
     } catch (error) {
         const err = error as AxiosError<any>;
         logger.error("❌ Failed to create subscription");
 
+        // Build a human-readable error string and save to subscription.json
+        let errorSummary = `Error: Failed to create subscription`;
         if (err.response) {
-            logger.error("Status:", err.response.status);
-
+            errorSummary += `\nStatus: ${err.response.status}`;
             if (err.response.data?.error?.message) {
-                logger.error("\n💡 Error message:", err.response.data.error.message);
-
-                // Provide helpful hints based on error
-                if (err.response.data.error.message.includes("Unable to connect")) {
-                    logger.error("\n🔧 Troubleshooting steps:");
-                    logger.error("   1. Make sure your server is running (npm start)");
-                    logger.error("   2. Verify PUBLIC_URL in .env is correct and uses HTTPS");
-                    logger.error("   3. Check if your server has a valid SSL certificate");
-                    logger.error("   4. Test your webhook URL manually: curl -X POST " + env.PUBLIC_URL + "/email-notification?validationToken=test");
-                } else {
-                    logger.error("Error details:", JSON.stringify(err.response.data, null, 2));
-                }
+                errorSummary += `\nMessage: ${err.response.data.error.message}`;
+            } else {
+                errorSummary += `\nDetails: ${JSON.stringify(err.response.data, null, 2)}`;
             }
         } else {
-            logger.error("Error:", err.message);
+            errorSummary += `\nMessage: ${err.message}`;
         }
 
+        logger.error(errorSummary);
+        writeSubscriptionLog(errorSummary);
         process.exit(1);
     }
 }
