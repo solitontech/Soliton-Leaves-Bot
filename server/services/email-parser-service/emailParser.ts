@@ -29,7 +29,7 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
             bodyPreview: emailData.bodyPreview || ""
         };
 
-        logger.parsingEmailFrom(emailContent.from);
+        logger.info(`📧 Parsing email:\n${JSON.stringify({ from: emailContent.from, subject: emailContent.subject, bodyPreview: emailContent.bodyPreview, body: emailContent.body }, null, 2)}`);
 
         // Prepare the prompt for OpenAI
         const prompt = getLeaveRequestPrompt(emailContent);
