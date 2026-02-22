@@ -101,7 +101,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             // ── Step 4: Validate manager inclusion (if MANAGER_REQUIRED=true) ──────
             if (env.MANAGER_REQUIRED) {
                 leaveLogger.info(`🌳 Fetching org tree to verify manager inclusion...`);
-                const orgTree = await getEmployeeOrgTree(employee.employeeId);
+                const orgTree = await getEmployeeOrgTree(employee.employeeNo);
                 const immediateManager = orgTree[0];
 
                 if (!immediateManager) {
