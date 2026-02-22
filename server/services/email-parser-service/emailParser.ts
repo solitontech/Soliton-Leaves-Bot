@@ -99,7 +99,7 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
         for (let i = 0; i < parsedItems.length; i++) {
             const parsedData = parsedItems[i]!;
             const result: LeaveRequest = {
-                fromEmail: emailContent.from,
+                fromEmail: parsedData.fromEmail,
                 fromDate: parsedData.fromDate || null,
                 toDate: parsedData.toDate || parsedData.endDate || null,
                 leaveType: parsedData.leaveType || null,
