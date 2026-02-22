@@ -26,7 +26,7 @@ For each leave request extract:
 Email Details:
 From: ${emailContent.from}
 Subject: ${emailContent.subject}
-Body: ${emailContent.bodyPreview || emailContent.body}
+Body: ${emailContent.body}
 
 **Detecting forwarded or replied emails:**
 The email body may contain a forwarded or replied message. Look for patterns like:

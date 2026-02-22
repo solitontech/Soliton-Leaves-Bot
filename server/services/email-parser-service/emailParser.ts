@@ -16,16 +16,42 @@ const openai = new OpenAI({
 });
 
 /**
+ * Strip HTML tags from a string and decode common HTML entities,
+ * producing readable plain text suitable for AI parsing.
+ */
+function stripHtml(html: string): string {
+    return html
+        .replace(/<style[\s\S]*?<\/style>/gi, '')   // remove <style> blocks
+        .replace(/<script[\s\S]*?<\/script>/gi, '')  // remove <script> blocks
+        .replace(/<br\s*\/?>/gi, '\n')               // <br> → newline
+        .replace(/<\/p>/gi, '\n')                    // </p> → newline
+        .replace(/<[^>]+>/g, '')                      // strip all remaining tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/[ \t]+/g, ' ')                      // collapse horizontal whitespace
+        .replace(/\n{3,}/g, '\n\n')                  // collapse excessive blank lines
+        .trim();
+}
+
+/**
  * Parse email content to extract one or more leave request details.
  * Returns an array — a single email may contain multiple leave requests.
  */
 export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequest[]> {
     try {
         // Extract relevant email information
+        // Use the full body (HTML-stripped to plain text) rather than the truncated bodyPreview
+        const rawBody = emailData.body?.content || "";
+        const plainBody = rawBody ? stripHtml(rawBody) : (emailData.bodyPreview || "");
+
         const emailContent: EmailContent = {
             from: emailData.from?.emailAddress?.address || "Unknown",
             subject: emailData.subject || "",
-            body: emailData.body?.content || "",
+            body: plainBody,
             bodyPreview: emailData.bodyPreview || ""
         };
 
