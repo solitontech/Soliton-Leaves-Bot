@@ -17,7 +17,7 @@ import { fileURLToPath } from "url";
 // ── Resolve the DB path (same as databaseService.ts) ─────────────────────────
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, "..");
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const DB_PATH = path.join(PROJECT_ROOT, "data", "leaves.db");
 
 // ── Open the database (read-only) ───────────────────────────────────────────

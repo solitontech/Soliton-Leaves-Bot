@@ -8,7 +8,7 @@ import LOG from "../loggerService.js";
 // ── Resolve the data directory relative to the project root ──────────────────
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 const DATA_DIR = path.join(PROJECT_ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "leaves.db");
 
