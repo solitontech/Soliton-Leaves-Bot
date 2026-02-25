@@ -5,14 +5,13 @@ import { processLeaveApplication } from "./services/leaveApplicationService.js";
 import { parseLeaveRequest, MissingFieldsError } from "./services/email-service/emailParser.js";
 import { resolveLeaveEmailFromThread } from "./services/email-service/emailThreadService.js";
 import { validateLeaveRequest } from "./services/email-service/emailValidationService.js";
-import { getEmployeeByEmail, getEmployeeOrgTree, getEmployeeById } from "./services/greytHr-service/greytHrClient.js";
+import { getEmployeeByEmail } from "./services/greytHr-service/greytHrClient.js";
 import {
     sendSuccessNotification,
     sendFailureNotification,
     sendValidationErrorNotification,
     sendMissingFieldsNotification,
     sendNoLeaveRequestsNotification,
-    sendManagerNotIncludedNotification
 } from "./services/notificationService.js";
 import env from "./env.js";
 import LOG, { createLeaveLogger } from "./services/loggerService.js";
