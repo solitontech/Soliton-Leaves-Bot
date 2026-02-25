@@ -9,7 +9,6 @@ import LOG from "./loggerService.js";
 import type {
     EmailData,
     LeaveRequest,
-    LeaveApplicationResult,
     GreytHREmployee
 } from "../types/index.js";
 
@@ -86,21 +85,30 @@ export async function sendSuccessNotification(
 }
 
 /**
- * Send failure notification email to the leave requester
+ * Send failure/error notification email to the leave requester.
  * @param email - The original email
  * @param senderEmail - Recipient email address
- * @param employee - Employee details
- * @param result - Failure result with error
  * @param token - Graph API access token
+ * @param errorMessage - Optional error description; shown in the email body when provided
  */
 export async function sendFailureNotification(
     email: EmailData,
     senderEmail: string,
-    employee: GreytHREmployee,
-    result: LeaveApplicationResult,
-    token: string
+    token: string,
+    errorMessage?: string
 ): Promise<void> {
     LOG.info(`📧 Sending failure notification to ${senderEmail}...`);
+
+    const errorLine = errorMessage
+        ? `<p><strong>Error:</strong> ${errorMessage}</p>`
+        : ``;
+    const suggestion = `
+        <p><strong>Please remember the following:</strong></p>
+        <ul>
+            <li>Do you have any leaves of this type left?</li>
+            <li>Have you already taken leaves on any of these dates? You cannot have multiple leaves on the same date.</li>
+            <li>Sick leaves cannot be taken in the future.</li>
+        </ul>`;
 
     const failureMessage = {
         message: {
@@ -108,10 +116,10 @@ export async function sendFailureNotification(
             body: {
                 contentType: "HTML",
                 content: `
-                    <p>Hello ${employee.name},</p>
+                    <p>Hello,</p>
                     <p><strong>❌ Failed to submit your leave application.</strong></p>
-                    <p><strong>Error:</strong> ${!result.success ? result.error : 'Unknown error'}</p>
-                    <p>Please check if you have any leaves of this type left, or whether you have already taken a leave on these dates. Also please note that sick leaves cannot be taken for the future.</p>
+                    ${errorLine}
+                    ${suggestion}
                     <p><strong><u>Once you have corrected the error, please send a new email.</u></strong></p>
                     <p>If all else fails please contact HR or IT support for assistance, or manually submit your leave request.</p>
                     <p>Best regards,<br/>Leave Management AI</p>
@@ -128,6 +136,51 @@ export async function sendFailureNotification(
     );
 
     LOG.info(`📧 Failure notification sent to ${senderEmail}`);
+}
+
+/**
+ * Send notification when a leave request fails pre-submission validation.
+ * @param email - The original email
+ * @param senderEmail - Recipient email address
+ * @param validationError - Human-readable description of the validation problem
+ * @param suggestion - Actionable suggestion for the user to fix the issue
+ * @param token - Graph API access token
+ */
+export async function sendValidationErrorNotification(
+    email: EmailData,
+    senderEmail: string,
+    validationError: string,
+    suggestion: string,
+    token: string
+): Promise<void> {
+    LOG.info(`📧 Sending validation error notification to ${senderEmail}...`);
+
+    const message = {
+        message: {
+            subject: `RE: ${email.subject}`,
+            body: {
+                contentType: "HTML",
+                content: `
+                    <p>Hello,</p>
+                    <p><strong>❌ Your leave request could not be processed.</strong></p>
+                    <p><strong>Reason:</strong> ${validationError}</p>
+                    <p>${suggestion}</p>
+                    <p><strong><u>Please correct the issue and send a new email.</u></strong></p>
+                    <p>If you believe this is an error, please contact HR or IT support for assistance.</p>
+                    <p>Best regards,<br/>Leave Management AI</p>
+                `
+            },
+            ...buildReplyRecipients(email, senderEmail),
+        }
+    };
+
+    await axios.post(
+        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.id}/reply`,
+        message,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    );
+
+    LOG.info(`📧 Validation error notification sent to ${senderEmail}`);
 }
 
 /**
@@ -186,48 +239,7 @@ export async function sendMissingFieldsNotification(
     LOG.info(`📧 Missing fields notification sent to ${senderEmail}`);
 }
 
-/**
- * Send error notification email when an exception occurs during processing
- * @param email - The original email
- * @param senderEmail - Recipient email address
- * @param errorMessage - Error description
- * @param token - Graph API access token
- */
-export async function sendErrorNotification(
-    email: EmailData,
-    senderEmail: string,
-    errorMessage: string,
-    token: string
-): Promise<void> {
-    LOG.info(`📧 Sending error notification to ${senderEmail}...`);
 
-    const errorEmailMessage = {
-        message: {
-            subject: `RE: ${email.subject}`,
-            body: {
-                contentType: "HTML",
-                content: `
-                    <p>Hello,</p>
-                    <p><strong>❌ An error occurred while processing your leave request.</strong></p>
-                    <p><strong>Error:</strong> ${errorMessage}</p>
-                    <p>Please check if you have any leaves of this type left, or whether you have already taken a leave on these dates. Also please note that sick leaves cannot be taken for the future.</p>
-                    <p><strong><u>Once you have corrected the error, please send a new email.</u></strong></p>
-                    <p>If all else fails please contact HR or IT support for assistance, or manually submit your leave request.</p>
-                    <p>Best regards,<br/>Leave Management AI</p>
-                `
-            },
-            ...buildReplyRecipients(email, senderEmail),
-        }
-    };
-
-    await axios.post(
-        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.id}/reply`,
-        errorEmailMessage,
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-    );
-
-    LOG.info(`📧 Error notification sent to ${senderEmail}`);
-}
 
 /**
  * Send notification when no leave requests or cancellations were found in the email

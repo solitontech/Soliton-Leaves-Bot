@@ -2,13 +2,14 @@ import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import getGraphToken from "../graph-authentication/graphAuth.js";
 import { processLeaveApplication } from "./services/leaveApplicationService.js";
-import { parseLeaveRequest, MissingFieldsError } from "./services/email-parser-service/emailParser.js";
-import { resolveLeaveEmailFromThread } from "./services/email-parser-service/emailThreadService.js";
+import { parseLeaveRequest, MissingFieldsError } from "./services/email-service/emailParser.js";
+import { resolveLeaveEmailFromThread } from "./services/email-service/emailThreadService.js";
+import { validateLeaveRequest } from "./services/email-service/emailValidationService.js";
 import { getEmployeeByEmail, getEmployeeOrgTree, getEmployeeById } from "./services/greytHr-service/greytHrClient.js";
 import {
     sendSuccessNotification,
     sendFailureNotification,
-    sendErrorNotification,
+    sendValidationErrorNotification,
     sendMissingFieldsNotification,
     sendNoLeaveRequestsNotification,
     sendManagerNotIncludedNotification
@@ -107,41 +108,24 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             leaveLogger.info(`👤 Fetching employee details from GreytHR for: ${leaveRequesterEmail}`);
             const employee = await getEmployeeByEmail(leaveRequesterEmail);
 
-            // ── Step 4: Validate manager inclusion (if MANAGER_REQUIRED=true) ──────
-            if (env.MANAGER_REQUIRED) {
-                leaveLogger.info(`🌳 Fetching org tree to verify manager inclusion...`);
-                const orgTree = await getEmployeeOrgTree(employee.employeeId);
-                const immediateManager = orgTree[0];
-
-                if (!immediateManager) {
-                    leaveLogger.warn(`⚠️  No manager found in org tree — skipping manager check.`);
-                } else {
-                    const manager = await getEmployeeById(String(immediateManager.manager.employeeId));
-                    const managerEmailLower = manager.email.toLowerCase();
-
-                    const allRecipients = [
-                        ...(leaveEmail.toRecipients ?? []),
-                        ...(leaveEmail.ccRecipients ?? []),
-                    ].map(r => r.emailAddress.address.toLowerCase());
-
-                    if (!allRecipients.includes(managerEmailLower)) {
-                        leaveLogger.warn(`❌ Manager (${manager.email}) not found in To/CC. Rejecting leave request.`);
-                        await sendManagerNotIncludedNotification(leaveEmail, sender, manager.name, manager.email, token);
-                        return;
-                    }
-
-                    leaveLogger.info(`✅ Manager (${manager.name}) verified in email recipients.`);
-                }
-            }
-
-
-            // ── Steps 5 & 6: Process each leave request independently ─────────────────
+            // ── Step 4: Process each leave request independently ─────────────────
             for (let i = 0; i < leaveRequests.length; i++) {
                 const leaveRequest = leaveRequests[i]!;
                 const label = leaveRequests.length > 1 ? ` [${i + 1}/${leaveRequests.length}]` : "";
 
                 // ── Add parsed leave to database before attempting submission ─────
                 const parsedLeaveId = addLeaveToDB(emailLogId, leaveRequest);
+
+                // ── Pre-submission validation ────────────────────────────────────
+                const validation = validateLeaveRequest(leaveRequest);
+                if (!validation.valid) {
+                    leaveLogger.warn(`❌ Validation failed${label}: ${validation.error}`);
+                    markLeaveFailedInDB(parsedLeaveId, validation.error);
+                    await sendValidationErrorNotification(
+                        leaveEmail, sender, validation.error, validation.suggestion, token
+                    );
+                    continue;
+                }
 
                 try {
                     leaveLogger.info(`🚀 Submitting leave application${label} to GreytHR...`);
@@ -156,13 +140,13 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                         await sendSuccessNotification(leaveEmail, sender, employee, leaveRequest, token);
                     } else {
                         leaveLogger.error(`❌ Leave application${label} failed!`);
-                        await sendFailureNotification(leaveEmail, sender, employee, result, token);
+                        await sendFailureNotification(leaveEmail, sender, token, !result.success ? result.error : undefined);
                     }
                 } catch (leaveError) {
                     const le = leaveError as Error;
                     markLeaveFailedInDB(parsedLeaveId, le.message);
                     leaveLogger.error(`❌ Error processing leave application${label}: ${le.message}`);
-                    await sendErrorNotification(leaveEmail, sender, le.message, token);
+                    await sendFailureNotification(leaveEmail, sender, token, le.message);
                 }
             }
 
@@ -195,7 +179,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             const token = await getGraphToken();
             const { leaveEmail, sender } = await resolveLeaveEmailFromThread(messageId, token);
             if (sender) {
-                await sendErrorNotification(leaveEmail, sender, err.message, token);
+                await sendFailureNotification(leaveEmail, sender, token, err.message);
             }
         } catch (notificationError) {
             LOG.error(`⚠️  Failed to send error notification`);
