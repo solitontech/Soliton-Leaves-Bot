@@ -40,7 +40,8 @@
     },
     "include": [
         "server/**/*",
-        "graph-authentication/**/*"
+        "graph-authentication/**/*",
+        "analytics/**/*"
     ],
     "exclude": [
         "node_modules",

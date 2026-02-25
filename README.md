@@ -9,6 +9,9 @@ A Microsoft Teams bot that automatically processes leave requests from emails us
 - **GreytHR Integration**: Automatically applies for leave in GreytHR HRMS
 - **Microsoft Teams Bot**: Integrates with Microsoft Teams for notifications
 - **Automated Processing**: Validates and processes leave requests automatically
+- **SQLite Database**: Logs every incoming email and leave application outcome for auditing
+- **Analytics**: Yearly report script to view email and leave request statistics
+- **Automated Backups**: Rotating 7-day database backup via cron
 - **Centralized Configuration**: Environment variables managed in a single location
 
 ## 🚀 Installation
@@ -191,40 +194,173 @@ cd /home/youruser/Soliton-Leaves-Bot && /usr/bin/npm run subscribe:prod
 ```
 If it succeeds, the cron job will too.
 
+## 🗄️ Database
+
+The bot uses an embedded **SQLite** database (via `better-sqlite3`) to log every incoming email and leave application result. The database is auto-created on first server start — no manual setup needed.
+
+### Location
+
+```
+data/leaves.db
+```
+
+> The `data/` directory is gitignored and created automatically.
+
+### Schema
+
+- **`email_logs`** — One row per incoming email notification
+  - `received_at`, `sender_email`, `has_leaves`, `leave_count`
+- **`parsed_leaves`** — One row per parsed leave request (linked to `email_logs`)
+  - `leave_type`, `from_date`, `to_date`, `from_email`, `reason`, `confidence`, `applied_success`, `failure_reason`
+
+### Querying the Database
+
+You can inspect the database at any time using `sqlite3`:
+```bash
+sqlite3 data/leaves.db "SELECT * FROM email_logs ORDER BY id DESC LIMIT 10;"
+sqlite3 data/leaves.db "SELECT * FROM parsed_leaves ORDER BY id DESC LIMIT 10;"
+```
+
+Or join for a full picture:
+```sql
+SELECT e.received_at, e.sender_email, p.leave_type, p.from_date, p.to_date, p.applied_success, p.failure_reason
+FROM email_logs e
+LEFT JOIN parsed_leaves p ON p.email_log_id = e.id
+ORDER BY e.id DESC;
+```
+
+## 📊 Analytics
+
+A standalone script to generate a yearly summary report from the database.
+
+### Usage
+
+```bash
+npm run build && npm run analytics
+```
+
+### Sample Output
+
+```
+📊 Leaves Bot — 2026 Yearly Report
+══════════════════════════════════════════════════
+
+📧 Emails received:          42
+📝 Leave requests parsed:    38
+✅ Successfully applied:     35 / 38 (92.1%)
+❌ Failed / pending:         3 / 38 (7.9%)
+
+══════════════════════════════════════════════════
+```
+
+## 💾 Database Backup
+
+A bash script that copies the `data/` folder to `/backup/leaves-bot/` on the machine root, keeping **7 rotating daily copies** (one per day of the week). Each day's backup overwrites the same day from the previous week.
+
+### One-Time Setup (on the production server)
+
+**1. Create the backup directory and set ownership:**
+```bash
+sudo mkdir -p /backup/leaves-bot
+sudo chown $(whoami) /backup/leaves-bot
+```
+
+**2. Make the backup script executable** (if not already):
+```bash
+chmod +x backup/backup-db.sh
+```
+
+### Manual Run
+
+```bash
+./backup/backup-db.sh
+```
+
+### Automating with Cron
+
+**1. Open the crontab editor:**
+```bash
+crontab -e
+```
+
+**2. Add the following entry** (replacing the path with yours):
+```cron
+0 3 * * * /home/youruser/Soliton-Leaves-Bot/backup/backup-db.sh >> /backup/leaves-bot/backup.log 2>&1
+```
+
+This runs at **3:00 AM every night**.
+
+**3. Verify it was saved:**
+```bash
+crontab -l
+```
+
+### Backup Structure
+
+```
+/backup/leaves-bot/
+├── Monday/        ← overwritten every Monday
+├── Tuesday/       ← overwritten every Tuesday
+├── Wednesday/
+├── Thursday/
+├── Friday/
+├── Saturday/
+├── Sunday/
+└── backup.log     ← cron output log
+```
+
+### Checking the Logs
+
+All backup output (success/failure messages) is appended to:
+```
+/backup/leaves-bot/backup.log
+```
+
 ## �📦 Dependencies
 
 ### Production Dependencies
 - **@microsoft/botbuilder** (^4.22.0) - Microsoft Bot Framework SDK
 - **axios** (^1.6.5) - HTTP client for API requests
+- **better-sqlite3** - Embedded SQLite database driver
 - **body-parser** (^1.20.2) - Express middleware for parsing request bodies
 - **dotenv** (^16.4.1) - Environment variable management
 - **express** (^4.18.2) - Web server framework
 - **openai** (^4.28.0) - OpenAI API client
 - **qs** (^6.11.2) - Query string parser
+- **winston** (^3.19.0) - Logging framework
 
 ### Development Dependencies
+- **@types/better-sqlite3** - TypeScript definitions for better-sqlite3
 - **nodemon** (^3.0.3) - Auto-restart server on file changes
 
 ## 🏗️ Project Structure
 
 ```
 Soliton-Leaves-Bot/
+├── analytics/
+│   └── yearlyReport.ts        # Yearly statistics report script
+├── backup/
+│   └── backup-db.sh           # Database backup script (7-day rotation)
+├── data/                      # Auto-created, gitignored
+│   └── leaves.db              # SQLite database
 ├── graph-authentication/
-│   ├── graphAuth.ts          # Microsoft Graph authentication
+│   ├── graphAuth.ts           # Microsoft Graph authentication
 │   └── subscribe.ts           # Mailbox subscription setup
 ├── server/
-│   ├── email-parser-service/
-│   │   ├── emailParser.ts    # Email parsing logic
-│   │   └── prompts.ts        # AI prompts for parsing
 │   ├── services/
-│   │   ├── greytHr-service/  # GreytHR API integration
-│   │   ├── notificationService.ts # Email notification logic
+│   │   ├── database-service/
+│   │   │   └── databaseService.ts  # SQLite database operations
+│   │   ├── email-parser-service/
+│   │   │   ├── emailParser.ts      # Email parsing logic
+│   │   │   └── prompts.ts          # AI prompts for parsing
+│   │   ├── greytHr-service/        # GreytHR API integration
+│   │   ├── notificationService.ts  # Email notification logic
 │   │   ├── leaveApplicationService.ts # Leave request logic
-│   │   └── loggerService.ts  # Centralized logging
-│   ├── types/                # TypeScript type definitions
-│   ├── env.ts                # Centralized environment config
-│   └── server.ts             # Main server application
-├── .env.example              # Environment variables template
+│   │   └── loggerService.ts        # Centralized logging
+│   ├── types/                 # TypeScript type definitions
+│   ├── env.ts                 # Centralized environment config
+│   └── server.ts              # Main server application
+├── .env.example               # Environment variables template
 ├── .gitignore
 ├── package.json
 └── README.md
@@ -242,6 +378,7 @@ Soliton-Leaves-Bot/
 | `npm run build` | — | Compile TypeScript to `dist/` |
 | `npm run type-check` | — | Type-check without emitting files |
 | `npm run clean` | — | Delete the `dist/` folder |
+| `npm run analytics` | — | Run yearly analytics report from the database |
 
 ### Environment Files
 

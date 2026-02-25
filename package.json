@@ -16,6 +16,7 @@
         "delete-sub:prod": "DOTENV_PATH=.env.prod node dist/graph-authentication/deleteSubscriptions.js",
         "type-check": "tsc --noEmit",
         "clean": "rm -rf dist",
+        "analytics": "node dist/analytics/yearlyReport.js",
         "prebuild": "npm run clean",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
