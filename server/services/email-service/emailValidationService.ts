@@ -31,6 +31,8 @@ export function validateLeaveRequest(leaveRequest: LeaveRequest): ValidationResu
     const to = new Date(leaveRequest.toDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    from.setHours(0, 0, 0, 0);
+    to.setHours(0, 0, 0, 0);
 
     // 1. Sick leave cannot be applied for future dates
     if (leaveRequest.leaveType?.toLowerCase() === "sick leave" && from > today) {
