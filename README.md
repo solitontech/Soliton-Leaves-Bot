@@ -91,14 +91,14 @@ To run the application and ngrok persistently (so they don't stop when you close
 **Option 1: Using tmux (Recommended)**
 1. Use **`tmux`** to create a persistent session:
    ```bash
-   tmux new -s bot
+   tmux new -s leaves-ai
    ```
 2. Inside the session, start the app:
    ```bash
    npm run prod
    ```
 3. To detach (leave it running in background), press `Ctrl+B`, then `D`.
-4. To check on it later, running: `tmux attach -t bot`
+4. To check on it later, running: `tmux attach -t leaves-ai`
 
 **Option 2: Using nohup (Simpler)**
 To run the app in the background:
@@ -108,16 +108,18 @@ nohup npm run prod &
 - To stop it, find the process ID: `pgrep -fl "node dist/server/server.js"`
 - Kill the process: `kill <PID>`
 
+### Running ngrok (in absence of domain + certificate)
 **Option 1: Using tmux (Recommended)**
 1. Start a new tmux session (or split your existing one):
    ```bash
-   tmux new -s ngrok
+   tmux new -s leaves-ngrok
    ```
 2. Start ngrok on your app's port (default 3978):
    ```bash
    ngrok http <port number>
    ```
 3. Detach with `Ctrl+B`, then `D`.
+4. To check on it later, running: `tmux attach -t leaves-ngrok`
 
 **Option 2: Using nohup (Simpler)**
 If you don't want to use tmux, you can run ngrok in the background:
@@ -129,7 +131,7 @@ nohup ngrok http <port number> > /dev/null 2>&1 &
 - To stop it, find the process ID with `pgrep ngrok` and run `kill <PID>`.
 
 ### Stopping the Persistent Processes
-1. Attach to the session: `tmux attach -t bot` (or `ngrok`)
+1. Attach to the session: `tmux attach -t leaves-ai` (or `leaves-ngrok`)
 2. Press `Ctrl+C` to stop the process.
 3. Type `exit` to close the session.
 

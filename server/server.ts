@@ -15,6 +15,7 @@ import {
 } from "./services/notificationService.js";
 import env from "./env.js";
 import LOG, { createLeaveLogger } from "./services/loggerService.js";
+import { addEmailToDB, updateEmailInDB, addLeaveToDB, updateLeaveInDB, markLeaveFailedInDB } from "./services/database-service/databaseService.js";
 import { CloudAdapter, ConfigurationServiceClientCredentialFactory, TurnContext } from "botbuilder";
 import https from 'https';
 import http from 'http';
@@ -74,14 +75,22 @@ app.post("/email-notification", async (req: Request, res: Response) => {
             return;
         }
 
-        // ── Create a per-request file logger ─────────────────────────────────────
+        // ── Create a per-request file logger ─────────────────────────────────
         const leaveLogger = createLeaveLogger(leaveEmail.receivedDateTime, sender);
         leaveLogger.info(`===== Leave Request Processing Started =====`);
+
+        // ── Immediately log the email to the database ────────────────────────
+        const emailLogId = addEmailToDB(leaveEmail.receivedDateTime, sender);
+        LOG.info(`📦 Email logged to database (id: ${emailLogId})`);
 
         try {
             // ── Step 2: Parse the leave request(s) from the resolved email ───────────
             leaveLogger.info(`🤖 Parsing leave request(s) with AI...`);
             const leaveRequests = await parseLeaveRequest(leaveEmail);
+
+            // ── Update the email record with parsing results ────────────────────
+            updateEmailInDB(emailLogId, leaveRequests.length);
+            leaveLogger.info(`📦 Email record updated in database (leaves found: ${leaveRequests.length})`);
 
             if (leaveRequests.length === 0) {
                 leaveLogger.warn(`⚠️  No leave requests or cancellations found in email. Notifying sender.`);
@@ -131,10 +140,16 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                 const leaveRequest = leaveRequests[i]!;
                 const label = leaveRequests.length > 1 ? ` [${i + 1}/${leaveRequests.length}]` : "";
 
+                // ── Add parsed leave to database before attempting submission ─────
+                const parsedLeaveId = addLeaveToDB(emailLogId, leaveRequest);
+
                 try {
                     leaveLogger.info(`🚀 Submitting leave application${label} to GreytHR...`);
                     leaveLogger.info(`   Type: ${leaveRequest.leaveType} | Tx: ${leaveRequest.transaction} | ${leaveRequest.fromDate} → ${leaveRequest.toDate}`);
                     const result = await processLeaveApplication(leaveRequest, employee);
+
+                    // ── Update the leave in database with the outcome ───────────
+                    updateLeaveInDB(parsedLeaveId, result);
 
                     if (result.success) {
                         leaveLogger.info(`✅ Leave application${label} submitted successfully!`);
@@ -145,6 +160,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                     }
                 } catch (leaveError) {
                     const le = leaveError as Error;
+                    markLeaveFailedInDB(parsedLeaveId, le.message);
                     leaveLogger.error(`❌ Error processing leave application${label}: ${le.message}`);
                     await sendErrorNotification(leaveEmail, sender, le.message, token);
                 }
