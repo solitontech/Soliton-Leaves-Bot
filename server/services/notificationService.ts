@@ -326,3 +326,60 @@ export async function sendManagerNotIncludedNotification(
 
     LOG.info(`📧 "Manager not included" notification sent to ${senderEmail}`);
 }
+
+/**
+ * Send notification when the sender's email is from outside the company domain
+ * and no valid internal account was provided.
+ * @param email - The original email
+ * @param senderEmail - Recipient email address (the original sender)
+ * @param externalEmail - The email address that was identified as external
+ * @param internalAccount - The internal account provided (if any), also external or null
+ * @param companyDomain - The expected company email domain
+ * @param token - Graph API access token
+ */
+export async function sendExternalDomainNotification(
+    email: EmailData,
+    senderEmail: string,
+    externalEmail: string,
+    internalAccount: string | null,
+    companyDomain: string,
+    token: string
+): Promise<void> {
+    LOG.info(`📧 Sending "external domain" notification to ${senderEmail}...`);
+
+    const internalAccountLine = internalAccount
+        ? `<p>An Internal Account was provided (<strong>${internalAccount}</strong>), but it is also not from the <strong>@${companyDomain}</strong> domain.</p>`
+        : `<p>No Internal Account was provided in the email.</p>`;
+
+    const message = {
+        message: {
+            subject: `RE: ${email.subject}`,
+            body: {
+                contentType: "HTML",
+                content: `
+                    <p>Hello,</p>
+                    <p><strong>❌ Your leave request could not be processed.</strong></p>
+                    <p>The sender email <strong>${externalEmail}</strong> is not from the company domain (<strong>@${companyDomain}</strong>).</p>
+                    ${internalAccountLine}
+                    <p>To submit a leave request, please ensure that:</p>
+                    <ul>
+                        <li>The email is sent from your <strong>@${companyDomain}</strong> email address, <strong>OR</strong></li>
+                        <li>The email body includes your company email as an Internal Account (e.g., <em>Internal Account: yourname@${companyDomain}</em>)</li>
+                    </ul>
+                    <p><strong><u>Please resend your leave request from your company email address or include a valid Internal Account.</u></strong></p>
+                    <p>If you believe this is an error, please contact HR or IT support for assistance.</p>
+                    <p>Best regards,<br/>Leave Management AI</p>
+                `
+            },
+            ...buildReplyRecipients(email, senderEmail),
+        }
+    };
+
+    await axios.post(
+        `https://graph.microsoft.com/v1.0/users/${env.MONITORED_EMAIL}/messages/${email.id}/reply`,
+        message,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    );
+
+    LOG.info(`📧 "External domain" notification sent to ${senderEmail}`);
+}

@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import getGraphToken from "../graph-authentication/graphAuth.js";
 import { processLeaveApplication } from "./services/leaveApplicationService.js";
-import { parseLeaveRequest, MissingFieldsError } from "./services/email-service/emailParser.js";
+import { parseLeaveRequest, MissingFieldsError, ExternalDomainError } from "./services/email-service/emailParser.js";
 import { resolveLeaveEmailFromThread } from "./services/email-service/emailThreadService.js";
 import { validateLeaveRequest } from "./services/email-service/emailValidationService.js";
 import { getEmployeeByEmail } from "./services/greytHr-service/greytHrClient.js";
@@ -12,6 +12,7 @@ import {
     sendValidationErrorNotification,
     sendMissingFieldsNotification,
     sendNoLeaveRequestsNotification,
+    sendExternalDomainNotification,
 } from "./services/notificationService.js";
 import env from "./env.js";
 import LOG, { createLeaveLogger } from "./services/loggerService.js";
@@ -156,6 +157,24 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
     } catch (error) {
         const err = error as Error;
+
+        // Handle external domain error specifically
+        if (err instanceof ExternalDomainError) {
+            LOG.error(`❌ External domain error: ${err.message}`);
+            try {
+                const token = await getGraphToken();
+                const { leaveEmail, sender } = await resolveLeaveEmailFromThread(messageId, token);
+                if (sender) {
+                    await sendExternalDomainNotification(
+                        leaveEmail, sender, err.externalEmail,
+                        err.internalAccount, env.COMPANY_EMAIL_DOMAIN, token
+                    );
+                }
+            } catch (notificationError) {
+                LOG.error(`⚠️  Failed to send external domain notification`);
+            }
+            return;
+        }
 
         // Handle missing fields error specifically
         if (err instanceof MissingFieldsError) {

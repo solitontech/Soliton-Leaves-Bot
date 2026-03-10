@@ -39,6 +39,9 @@ const env: EnvironmentConfig = {
     // Manager inclusion check (set to 'true' to require manager in leave request email)
     MANAGER_REQUIRED: process.env['MANAGER_REQUIRED'] === 'true',
 
+    // Company email domain (used to verify sender is from the organization)
+    COMPANY_EMAIL_DOMAIN: process.env['COMPANY_EMAIL_DOMAIN']!,
+
     // SSL Certificate Configuration (optional, for HTTPS)
     SSL_KEY_PATH: process.env['SSL_KEY_PATH'],
     SSL_CERT_PATH: process.env['SSL_CERT_PATH'],
@@ -63,6 +66,7 @@ function validateEnv(): void {
         'OPENAI_API_KEY',
         'PUBLIC_URL',
         'MONITORED_EMAIL',
+        'COMPANY_EMAIL_DOMAIN',
         'GREYTHR_API_URL',
         'GREYTHR_AUTH_URL',
         'GREYTHR_DOMAIN',

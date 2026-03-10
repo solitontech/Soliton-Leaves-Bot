@@ -77,6 +77,7 @@ export interface LeaveRequest {
     confidence: ConfidenceLevel;
     fromSession?: number | null;
     toSession?: number | null;
+    internalAccount?: string | null;
 }
 
 export interface LeaveValidation {
@@ -227,6 +228,7 @@ export interface OpenAILeaveExtraction {
     confidence: ConfidenceLevel;
     fromSession?: number | null;
     toSession?: number | null;
+    internalAccount?: string | null;
 }
 
 // ============================================================================
@@ -258,6 +260,9 @@ export interface EnvironmentConfig {
 
     // Whether the employee's manager must be included in the leave request email
     MANAGER_REQUIRED: boolean;
+
+    // Company email domain (used to verify sender is from the organization)
+    COMPANY_EMAIL_DOMAIN: string;
 
     // SSL Certificate Configuration
     SSL_KEY_PATH?: string;

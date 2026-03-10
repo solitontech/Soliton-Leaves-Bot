@@ -38,6 +38,41 @@ function stripHtml(html: string): string {
 }
 
 /**
+ * Check whether an email address belongs to the configured company domain.
+ */
+function isCompanyEmail(email: string): boolean {
+    const domain = email.split('@')[1]?.toLowerCase();
+    return domain === env.COMPANY_EMAIL_DOMAIN.toLowerCase();
+}
+
+/**
+ * Resolve the effective `fromEmail` for a leave request based on domain rules.
+ *
+ * 1. If the parsed `fromEmail` is from the company domain → use it as-is.
+ * 2. If it's external but an `internalAccount` exists and IS from the company domain → use the internal account.
+ * 3. Otherwise → throw `ExternalDomainError`.
+ */
+function resolveFromEmail(leaveRequest: LeaveRequest): string {
+    if (isCompanyEmail(leaveRequest.fromEmail)) {
+        return leaveRequest.fromEmail;
+    }
+
+    // External sender — try the internal account fallback
+    if (leaveRequest.internalAccount && isCompanyEmail(leaveRequest.internalAccount)) {
+        logger.info(
+            `🔄 External sender (${leaveRequest.fromEmail}), using internal account: ${leaveRequest.internalAccount}`
+        );
+        return leaveRequest.internalAccount;
+    }
+
+    // No valid company email available
+    throw new ExternalDomainError(
+        leaveRequest.fromEmail,
+        leaveRequest.internalAccount ?? null
+    );
+}
+
+/**
  * Parse email content to extract one or more leave request details.
  * Returns an array — a single email may contain multiple leave requests.
  */
@@ -108,6 +143,7 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
                 confidence: parsedData.confidence || "low",
                 fromSession: parsedData.fromSession ? parseInt(String(parsedData.fromSession), 10) : null,
                 toSession: parsedData.toSession ? parseInt(String(parsedData.toSession), 10) : null,
+                internalAccount: parsedData.internalAccount || null,
             };
 
             logger.parsedLeaveRequest(result);
@@ -117,6 +153,9 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
                 const prefix = parsedItems.length > 1 ? `Leave request ${i + 1}: ` : "";
                 allMissingFields.push(...validation.missingFields.map(f => `${prefix}${f}`));
             } else {
+                // ── Domain validation: resolve effective fromEmail ──
+                const resolvedEmail = resolveFromEmail(result);
+                result.fromEmail = resolvedEmail;
                 results.push(result);
             }
         }
@@ -131,6 +170,10 @@ export async function parseLeaveRequest(emailData: EmailData): Promise<LeaveRequ
 
     } catch (error) {
         const err = error as AxiosError<any> | Error;
+        // Re-throw domain and missing-fields errors without wrapping
+        if (err instanceof ExternalDomainError || err instanceof MissingFieldsError) {
+            throw err;
+        }
         logger.error("Error parsing leave request:", err.message);
 
         if (axios.isAxiosError(err) && err.response) {
@@ -179,5 +222,24 @@ export class MissingFieldsError extends Error {
         super(`Missing required fields: ${missingFields.join(', ')}`);
         this.name = 'MissingFieldsError';
         this.missingFields = missingFields;
+    }
+}
+
+/**
+ * Custom error class for external-domain senders with no valid internal account.
+ */
+export class ExternalDomainError extends Error {
+    public externalEmail: string;
+    public internalAccount: string | null;
+
+    constructor(externalEmail: string, internalAccount: string | null) {
+        const base = `The sender email "${externalEmail}" is not from the company domain (@${env.COMPANY_EMAIL_DOMAIN})`;
+        const detail = internalAccount
+            ? ` and the provided Internal Account "${internalAccount}" is also not from the company domain.`
+            : ' and no Internal Account was provided.';
+        super(base + detail);
+        this.name = 'ExternalDomainError';
+        this.externalEmail = externalEmail;
+        this.internalAccount = internalAccount;
     }
 }

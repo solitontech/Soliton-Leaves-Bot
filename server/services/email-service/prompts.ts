@@ -22,6 +22,7 @@ For each leave request extract:
 5. Reason for leave (if mentioned)
 6. From Session (optional): Session number for the start date (integer, 1 is first half of the day, 2 is second half of the day)
 7. To Session (optional): Session number for the end date (integer, 1 is first half of the day, 2 is second half of the day)
+8. Internal Account (optional): An email address associated with the keyword "Internal Account". Look for a line like "Internal Account: xyz@email.com" in the email body. If found, extract the email address. If not found, set to null.
 
 Email Details:
 From: ${emailContent.from}
@@ -52,6 +53,7 @@ Please respond ONLY with a valid JSON array. Even if there is only one leave req
     "reason": "reason for leave if mentioned",
     "fromSession": 1 or 2 or null,
     "toSession": 1 or 2 or null,
+    "internalAccount": "internal-email@example.com or null",
     "confidence": "high/medium/low"
   }
 ]
@@ -68,6 +70,7 @@ Important:
     - If people mention they are requesting leave from "first half" of fromDate to "first half" of toDate that means they are requesting fromSession 1 of fromDate and toSession 1 of toDate
     - If people mention they are requesting leave from "afternoon session" of fromDate to "second half" of toDate that means they are requesting fromSession 2 of fromDate and toSession 2 of toDate
     - If people mention they are requesting leave from "second half" of fromDate to "forenoon" of toDate that means they are requesting fromSession 2 of fromDate and toSession 1 of toDate
+- internalAccount is an optional field. Look for the keywords "Internal Account" followed by an email address in the email body. If found, return that email address. If not found, set to null.
 - If you cannot determine any field with confidence, use null for that field.`;
 
 }
