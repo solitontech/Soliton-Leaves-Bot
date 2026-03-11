@@ -122,7 +122,7 @@ app.post("/email-notification", async (req: Request, res: Response) => {
                     leaveLogger.warn(`❌ Validation failed${label}: ${validation.error}`);
                     markLeaveFailedInDB(parsedLeaveId, validation.error);
                     await sendValidationErrorNotification(
-                        leaveEmail, sender, validation.error, validation.suggestion, token
+                        leaveEmail, sender, validation.error, validation.suggestion, token, leaveRequest.fromEmail
                     );
                     continue;
                 }
@@ -137,16 +137,16 @@ app.post("/email-notification", async (req: Request, res: Response) => {
 
                     if (result.success) {
                         leaveLogger.info(`✅ Leave application${label} submitted successfully!`);
-                        await sendSuccessNotification(leaveEmail, sender, employee, leaveRequest, token);
+                        await sendSuccessNotification(leaveEmail, sender, employee, leaveRequest, token, leaveRequest.fromEmail);
                     } else {
                         leaveLogger.error(`❌ Leave application${label} failed!`);
-                        await sendFailureNotification(leaveEmail, sender, token, !result.success ? result.error : undefined);
+                        await sendFailureNotification(leaveEmail, sender, token, !result.success ? result.error : undefined, leaveRequest.fromEmail);
                     }
                 } catch (leaveError) {
                     const le = leaveError as Error;
                     markLeaveFailedInDB(parsedLeaveId, le.message);
                     leaveLogger.error(`❌ Error processing leave application${label}: ${le.message}`);
-                    await sendFailureNotification(leaveEmail, sender, token, le.message);
+                    await sendFailureNotification(leaveEmail, sender, token, le.message, leaveRequest.fromEmail);
                 }
             }
 

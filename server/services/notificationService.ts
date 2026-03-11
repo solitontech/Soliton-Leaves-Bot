@@ -9,30 +9,38 @@ import LOG from "./loggerService.js";
 import type {
     EmailData,
     LeaveRequest,
-    GreytHREmployee
+    GreytHREmployee,
 } from "../types/index.js";
 
 /**
  * Build the reply recipient lists for a notification email.
- * - To:  always the original sender (A)
- * - CC:  everyone from the original To + CC, excluding the monitored mailbox and the sender
- *        (avoids emailing the bot itself and avoids duplicating the sender in CC)
+ *
+ * Simple case (sender IS the leave applier):
+ *   - To:  the leave applier only
+ *   - CC:  none
+ *
+ * Forwarded / looped-in case (sender ≠ leave applier):
+ *   - To:  the actual leave applier (fromEmail parsed by AI)
+ *   - CC:  the person who forwarded / sent the email (senderEmail)
+ *
+ * @param senderEmail    - The email address of whoever physically sent the email
+ * @param leaveApplierEmail - (optional) The actual leave applicant's email, resolved by AI.
+ *                            When provided and different from senderEmail, the sender is CC'd.
  */
-function buildReplyRecipients(email: EmailData, senderEmail: string) {
-    const monitoredLower = env.MONITORED_EMAIL.toLowerCase();
+function buildReplyRecipients(senderEmail: string, leaveApplierEmail?: string) {
     const senderLower = senderEmail.toLowerCase();
+    const applierLower = (leaveApplierEmail ?? senderEmail).toLowerCase();
+    const effectiveTo = leaveApplierEmail ?? senderEmail;
 
-    const allOthers = [
-        ...(email.toRecipients ?? []),
-        ...(email.ccRecipients ?? []),
-    ].filter(r => {
-        const addr = r.emailAddress.address.toLowerCase();
-        return addr !== monitoredLower && addr !== senderLower;
-    });
+    // If the sender and the leave applier are different, CC the forwarder
+    const ccRecipients: Array<{ emailAddress: { address: string } }> = [];
+    if (leaveApplierEmail && applierLower !== senderLower) {
+        ccRecipients.push({ emailAddress: { address: senderEmail } });
+    }
 
     return {
-        toRecipients: [{ emailAddress: { address: senderEmail } }],
-        ccRecipients: allOthers,
+        toRecipients: [{ emailAddress: { address: effectiveTo } }],
+        ccRecipients,
     };
 }
 
@@ -50,9 +58,10 @@ export async function sendSuccessNotification(
     senderEmail: string,
     employee: GreytHREmployee,
     leaveRequest: LeaveRequest,
-    token: string
+    token: string,
+    leaveApplierEmail?: string
 ): Promise<void> {
-    LOG.info(`📧 Sending success notification to ${senderEmail}...`);
+    LOG.info(`📧 Sending success notification to ${leaveApplierEmail ?? senderEmail}...`);
 
     const successMessage = {
         message: {
@@ -71,7 +80,7 @@ export async function sendSuccessNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail, leaveApplierEmail),
         }
     };
 
@@ -95,9 +104,10 @@ export async function sendFailureNotification(
     email: EmailData,
     senderEmail: string,
     token: string,
-    errorMessage?: string
+    errorMessage?: string,
+    leaveApplierEmail?: string
 ): Promise<void> {
-    LOG.info(`📧 Sending failure notification to ${senderEmail}...`);
+    LOG.info(`📧 Sending failure notification to ${leaveApplierEmail ?? senderEmail}...`);
 
     const errorLine = errorMessage
         ? `<p><strong>Error:</strong> ${errorMessage}</p>`
@@ -125,7 +135,7 @@ export async function sendFailureNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail, leaveApplierEmail),
         }
     };
 
@@ -151,9 +161,10 @@ export async function sendValidationErrorNotification(
     senderEmail: string,
     validationError: string,
     suggestion: string,
-    token: string
+    token: string,
+    leaveApplierEmail?: string
 ): Promise<void> {
-    LOG.info(`📧 Sending validation error notification to ${senderEmail}...`);
+    LOG.info(`📧 Sending validation error notification to ${leaveApplierEmail ?? senderEmail}...`);
 
     const message = {
         message: {
@@ -170,7 +181,7 @@ export async function sendValidationErrorNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail, leaveApplierEmail),
         }
     };
 
@@ -226,7 +237,7 @@ export async function sendMissingFieldsNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail),
         }
     };
 
@@ -278,7 +289,7 @@ export async function sendNoLeaveRequestsNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail),
         }
     };
 
@@ -314,7 +325,7 @@ export async function sendManagerNotIncludedNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail),
         }
     };
 
@@ -371,7 +382,7 @@ export async function sendExternalDomainNotification(
                     <p>Best regards,<br/>Leave Management AI</p>
                 `
             },
-            ...buildReplyRecipients(email, senderEmail),
+            ...buildReplyRecipients(senderEmail),
         }
     };
 
